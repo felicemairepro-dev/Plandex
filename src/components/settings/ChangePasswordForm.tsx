@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function ChangePasswordForm() {
   const [password, setPassword] = useState("");
@@ -46,9 +46,8 @@ export function ChangePasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input
+        <PasswordInput
           id="new-password"
-          type="password"
           label="Nouveau mot de passe"
           autoComplete="new-password"
           placeholder="••••••••"
@@ -56,9 +55,8 @@ export function ChangePasswordForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <Input
+        <PasswordInput
           id="confirm-password"
-          type="password"
           label="Confirmer le mot de passe"
           autoComplete="new-password"
           placeholder="••••••••"

@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function UpdatePasswordForm() {
   const router = useRouter();
@@ -45,9 +45,8 @@ export function UpdatePasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <Input
+      <PasswordInput
         id="password"
-        type="password"
         label="Nouveau mot de passe"
         autoComplete="new-password"
         placeholder="••••••••"
@@ -55,9 +54,8 @@ export function UpdatePasswordForm() {
         onChange={(e) => setPassword(e.target.value)}
         required
       />
-      <Input
+      <PasswordInput
         id="confirmPassword"
-        type="password"
         label="Confirmer le mot de passe"
         autoComplete="new-password"
         placeholder="••••••••"

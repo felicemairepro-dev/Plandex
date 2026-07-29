@@ -22,11 +22,6 @@ export default function LoginPage() {
             <LoginForm />
           </Suspense>
         </Card>
-
-        <p className="mt-6 text-center text-sm text-muted">
-          Administrateur ou extra, ce même formulaire vous connecte à votre
-          espace.
-        </p>
       </div>
     </main>
   );

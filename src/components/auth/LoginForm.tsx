@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function LoginForm() {
   const router = useRouter();
@@ -68,9 +69,8 @@ export function LoginForm() {
         onChange={(e) => setEmail(e.target.value)}
         required
       />
-      <Input
+      <PasswordInput
         id="password"
-        type="password"
         label="Mot de passe"
         autoComplete="current-password"
         placeholder="••••••••"

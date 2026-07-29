@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signUpExtra, type SignUpResult } from "@/app/rejoindre/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const initialState: SignUpResult = {};
 
@@ -44,18 +45,16 @@ export function SignUpStep({ code }: { code: string }) {
       <Input id="email" name="email" type="email" label="Email" required />
       <Input id="phone" name="phone" type="tel" label="Téléphone" />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           label="Mot de passe"
           autoComplete="new-password"
           required
         />
-        <Input
+        <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           label="Confirmer"
           autoComplete="new-password"
           required
