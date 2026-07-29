@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Logo } from "@/components/ui/Logo";
 import { LoginForm } from "@/components/auth/LoginForm";
@@ -25,10 +24,8 @@ export default function LoginPage() {
         </Card>
 
         <p className="mt-6 text-center text-sm text-muted">
-          Vous êtes administrateur ?{" "}
-          <Link href="/login" className="text-accent hover:text-accent-hover">
-            Connectez-vous ici
-          </Link>
+          Administrateur ou extra, ce même formulaire vous connecte à votre
+          espace.
         </p>
       </div>
     </main>
