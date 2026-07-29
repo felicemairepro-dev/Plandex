@@ -2,7 +2,7 @@
 
 Application interne de gestion de planning pour les extras/indépendants. Accès privé : les comptes admin sont créés manuellement, les comptes extras s'auto-inscrivent via un code d'invitation à usage unique.
 
-**Stack** : Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (Auth + DB) · Resend · Vercel
+**Stack** : Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (Auth + DB) · Resend · Netlify
 
 ## Configuration du projet Supabase
 
@@ -33,13 +33,15 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
-6. Dans **Authentication > URL Configuration**, ajoutez votre URL de développement et de production (ex. `http://localhost:3000`, `https://votre-app.vercel.app`) aux **Redirect URLs**.
+6. Dans **Authentication > URL Configuration**, ajoutez votre URL de développement et de production (ex. `http://localhost:3000`, `https://votre-site.netlify.app`) aux **Redirect URLs**.
 
 7. Créez un compte sur [resend.com](https://resend.com) pour l'envoi des emails de créneau (étape à faire vous-même — nécessite vos propres identifiants). Récupérez une clé API dans **API Keys** et mettez-la dans `RESEND_API_KEY`. Pour du test rapide, l'expéditeur par défaut `onboarding@resend.dev` fonctionne sans configuration ; pour de la production, vérifiez votre propre domaine dans Resend et définissez `RESEND_FROM_EMAIL` (ex. `Plandex <planning@votredomaine.com>`).
 
 8. Pour les rappels automatiques (voir "Rappels de créneau" plus bas), ajoutez aussi :
-   - `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API — ne jamais exposer au navigateur, utilisé uniquement par la tâche planifiée).
+   - `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API — ne jamais exposer au navigateur, utilisé uniquement par la fonction planifiée).
    - `CRON_SECRET` (une chaîne aléatoire au choix).
+
+   **Important (Netlify)** : les variables préfixées `NEXT_PUBLIC_` sont injectées dans le bundle **au moment du build**, pas au runtime. `.env.local` ne sert qu'en local — sur Netlify, ces variables doivent être ajoutées dans **Site configuration > Environment variables**, puis un nouveau déploiement doit être déclenché pour qu'elles soient prises en compte (modifier la variable seule, sans redéployer, ne suffit pas).
 
 ## Créer le premier compte admin
 
@@ -89,9 +91,11 @@ Chaque extra a un **taux horaire** optionnel (`profiles.taux_horaire`, en €), 
 
 ## Rappels de créneau (tâche planifiée)
 
-Un rappel automatique est envoyé la veille de chaque créneau **confirmé** du lendemain, via [`vercel.json`](vercel.json) (Vercel Cron) qui appelle `GET /api/cron/reminders` tous les jours à `0 17 * * *` (17h00 **UTC**, soit ~18h à Paris — ajustez l'heure dans `vercel.json` selon votre fuseau et l'heure d'été/hiver ; Vercel Cron ne gère pas nativement les fuseaux locaux). La route est protégée par `CRON_SECRET` (Vercel l'envoie automatiquement en `Authorization: Bearer` quand la variable est définie sur le projet) et utilise la `service_role` key pour lire tous les créneaux, en dehors de toute session utilisateur.
+Un rappel automatique est envoyé la veille de chaque créneau **confirmé** du lendemain. La logique vit dans la route Next.js `GET /api/cron/reminders`, protégée par `CRON_SECRET` (`Authorization: Bearer ...`) et qui utilise la `service_role` key pour lire tous les créneaux, en dehors de toute session utilisateur.
 
-En local ou hors Vercel, vous pouvez déclencher ce rappel manuellement :
+Sur Netlify (pas de cron intégré à Next.js comme sur Vercel), le déclenchement quotidien passe par une **fonction planifiée** : [`netlify/functions/scheduled-reminders.mts`](netlify/functions/scheduled-reminders.mts), qui ne fait qu'appeler `/api/cron/reminders` avec le bon en-tête, tous les jours à `0 17 * * *` (17h00 **UTC**, soit ~18h à Paris — ajustez le cron dans ce fichier selon votre fuseau ; Netlify Scheduled Functions ne gèrent pas nativement les fuseaux locaux). Elle a besoin de `URL` (fournie automatiquement par Netlify) et de `CRON_SECRET` (à définir dans les variables d'environnement du site).
+
+En local, vous pouvez déclencher ce rappel manuellement sans passer par la fonction planifiée :
 
 ```bash
 curl -H "Authorization: Bearer VOTRE_CRON_SECRET" http://localhost:3000/api/cron/reminders
@@ -138,7 +142,7 @@ src/
     rejoindre/                 auto-inscription extra par code d'invitation
     update-password/           définition du nouveau mot de passe
     auth/confirm/               route d'échange du lien email Supabase
-    api/cron/reminders/         route appelée par Vercel Cron (rappels de créneau)
+    api/cron/reminders/         route déclenchée par la fonction planifiée (rappels de créneau)
     dashboard/                  tableau de bord (protégé, différent admin/extra)
     dashboard/team/             gestion de l'équipe + codes d'invitation (admin)
     dashboard/planning/         calendrier des créneaux (admin)
@@ -165,16 +169,18 @@ src/
   proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
   migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire, notifications, sécurité + RLS)
-vercel.json                    planification du rappel quotidien (Vercel Cron)
+netlify/
+  functions/                   fonction planifiée Netlify (déclenche le rappel quotidien)
+netlify.toml                   configuration de build/plugin Netlify
 ```
 
 ## Identité visuelle
 
 Palette « nature sobre » définie dans [`src/app/globals.css`](src/app/globals.css) via des variables CSS (`--accent` vert forêt, `--sand` beige naturel, fond blanc cassé, texte anthracite, statuts vert/orange/rouge discrets). Typographie : Manrope. Pour ajuster une teinte, modifier les variables dans `:root` — tous les composants (`Button`, `Badge`, `Card`, etc.) en héritent automatiquement.
 
-## Déploiement sur Vercel
+## Déploiement sur Netlify
 
-1. Importez le dépôt dans Vercel.
-2. Renseignez les mêmes variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`) dans **Project Settings > Environment Variables**.
-3. Ajoutez l'URL de production Vercel dans les **Redirect URLs** du projet Supabase (voir étape 6 ci-dessus).
-4. Le cron défini dans `vercel.json` s'active automatiquement au déploiement (vérifiable dans l'onglet **Cron Jobs** du projet Vercel).
+1. Importez le dépôt dans Netlify (New site from Git). Le plugin [`@netlify/plugin-nextjs`](netlify.toml) est déjà configuré et détecte automatiquement l'App Router.
+2. Renseignez les variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`) dans **Site configuration > Environment variables**, puis lancez (ou relancez) un déploiement — voir l'avertissement sur les variables `NEXT_PUBLIC_` plus haut.
+3. Ajoutez l'URL de production Netlify (ex. `https://votre-site.netlify.app`) dans les **Redirect URLs** du projet Supabase (voir étape 6 ci-dessus).
+4. La fonction planifiée [`netlify/functions/scheduled-reminders.mts`](netlify/functions/scheduled-reminders.mts) est détectée et activée automatiquement au déploiement (vérifiable dans l'onglet **Functions** du site Netlify).
