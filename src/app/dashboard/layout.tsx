@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/supabase/get-profile";
+import { createClient } from "@/lib/supabase/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Logo } from "@/components/ui/Logo";
+import type { Notification } from "@/lib/types";
 
 export default async function DashboardLayout({
   children,
@@ -17,6 +20,14 @@ export default async function DashboardLayout({
 
   const isAdmin = profile?.role === "admin";
 
+  const supabase = await createClient();
+  const { data: notifications } = await supabase
+    .from("notifications")
+    .select("id, user_id, message, lu, cree_le")
+    .order("cree_le", { ascending: false })
+    .limit(30)
+    .returns<Notification[]>();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
@@ -25,7 +36,10 @@ export default async function DashboardLayout({
             <Logo />
             <DashboardNav isAdmin={isAdmin} />
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-2">
+            <NotificationBell notifications={notifications ?? []} />
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { ExtraShiftCard } from "@/components/planning/ExtraShiftCard";
 import { ClockInOut } from "@/components/hours/ClockInOut";
+import { RequestReplacementButton } from "@/components/planning/RequestReplacementButton";
 import { WeekCalendar } from "@/components/planning/WeekCalendar";
 import { RecapView } from "@/components/hours/RecapView";
 import type {
@@ -78,6 +79,9 @@ export function ExtraDashboardTabs({
                         shift={shift}
                         entry={entriesByShiftId[shift.id] ?? null}
                       />
+                    )}
+                    {shift.statut === "confirme" && (
+                      <RequestReplacementButton shift={shift} />
                     )}
                   </ExtraShiftCard>
                 ))}

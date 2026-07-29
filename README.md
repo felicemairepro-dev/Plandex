@@ -28,12 +28,17 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    - [`supabase/migrations/0003_invite_codes.sql`](supabase/migrations/0003_invite_codes.sql) — table `invite_codes` et les fonctions qui gèrent leur génération/validation/consommation (voir plus bas).
    - [`supabase/migrations/0004_time_entries.sql`](supabase/migrations/0004_time_entries.sql) — table `time_entries` (badgage) et les fonctions `clock_in`/`clock_out` (voir "Badgage" plus bas).
    - [`supabase/migrations/0005_taux_horaire.sql`](supabase/migrations/0005_taux_horaire.sql) — ajoute `taux_horaire` à `profiles`, modifiable uniquement par un admin (trigger dédié).
+   - [`supabase/migrations/0006_swaps_and_notifications.sql`](supabase/migrations/0006_swaps_and_notifications.sql) — ajoute `remplacement_demande` à `shifts`, la fonction `request_shift_replacement`, et la table `notifications` (voir "Échanges de créneaux" plus bas).
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
 6. Dans **Authentication > URL Configuration**, ajoutez votre URL de développement et de production (ex. `http://localhost:3000`, `https://votre-app.vercel.app`) aux **Redirect URLs**.
 
 7. Créez un compte sur [resend.com](https://resend.com) pour l'envoi des emails de créneau (étape à faire vous-même — nécessite vos propres identifiants). Récupérez une clé API dans **API Keys** et mettez-la dans `RESEND_API_KEY`. Pour du test rapide, l'expéditeur par défaut `onboarding@resend.dev` fonctionne sans configuration ; pour de la production, vérifiez votre propre domaine dans Resend et définissez `RESEND_FROM_EMAIL` (ex. `Plandex <planning@votredomaine.com>`).
+
+8. Pour les rappels automatiques (voir "Rappels de créneau" plus bas), ajoutez aussi :
+   - `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API — ne jamais exposer au navigateur, utilisé uniquement par la tâche planifiée).
+   - `CRON_SECRET` (une chaîne aléatoire au choix).
 
 ## Créer le premier compte admin
 
@@ -81,6 +86,22 @@ Chaque extra a un **taux horaire** optionnel (`profiles.taux_horaire`, en €), 
 
 `/dashboard` (vue extra) est organisé en 3 onglets : **Planning** (créneaux à venir/passés, pointage sur les créneaux du jour), **Calendrier** (même calendrier semaine que la vue admin, mais en lecture seule et filtré à ses propres créneaux — un extra ne voit jamais le planning d'un autre), **Mes heures** (récapitulatif mensuel personnel).
 
+## Rappels de créneau (tâche planifiée)
+
+Un rappel automatique est envoyé la veille de chaque créneau **confirmé** du lendemain, via [`vercel.json`](vercel.json) (Vercel Cron) qui appelle `GET /api/cron/reminders` tous les jours à `0 17 * * *` (17h00 **UTC**, soit ~18h à Paris — ajustez l'heure dans `vercel.json` selon votre fuseau et l'heure d'été/hiver ; Vercel Cron ne gère pas nativement les fuseaux locaux). La route est protégée par `CRON_SECRET` (Vercel l'envoie automatiquement en `Authorization: Bearer` quand la variable est définie sur le projet) et utilise la `service_role` key pour lire tous les créneaux, en dehors de toute session utilisateur.
+
+En local ou hors Vercel, vous pouvez déclencher ce rappel manuellement :
+
+```bash
+curl -H "Authorization: Bearer VOTRE_CRON_SECRET" http://localhost:3000/api/cron/reminders
+```
+
+## Échanges de créneaux & notifications
+
+Depuis un créneau **confirmé à venir** sur son tableau de bord, un extra peut cliquer sur **Demander un remplacement** : le créneau affiche alors un badge orange « Remplacement demandé » (visible admin et extra), et tous les admins reçoivent une notification interne (et peuvent être notifiés par email — voir ci-dessous) — **aucune validation automatique** entre extras, l'admin garde la main. Pour résoudre la demande, l'admin modifie simplement le créneau depuis `/dashboard/planning` (réassignation à un autre extra ou non) : la sauvegarde du formulaire efface automatiquement le badge et notifie l'extra à l'origine de la demande que sa demande a été traitée.
+
+La cloche de notifications dans le header (table `notifications`, RLS : chacun ne voit que les siennes) liste ces évènements — nouveau créneau assigné, remplacement demandé (admin), remplacement traité (extra) — avec un compteur nouveaux non lus ; cliquer une notification la marque comme lue.
+
 ## Développement local
 
 ```bash
@@ -101,6 +122,7 @@ src/
     rejoindre/                 auto-inscription extra par code d'invitation
     update-password/           définition du nouveau mot de passe
     auth/confirm/               route d'échange du lien email Supabase
+    api/cron/reminders/         route appelée par Vercel Cron (rappels de créneau)
     dashboard/                  tableau de bord (protégé, différent admin/extra)
     dashboard/team/             gestion de l'équipe + codes d'invitation (admin)
     dashboard/planning/         calendrier des créneaux (admin)
@@ -109,20 +131,21 @@ src/
     ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo, Modal)
     auth/                      formulaires d'authentification
     join/                      flux d'auto-inscription (code puis formulaire)
-    dashboard/                 navigation + onglets du tableau de bord extra
+    dashboard/                 navigation, cloche de notifications, onglets du tableau de bord extra
     team/                      liste des extras + panneau de codes d'invitation
-    planning/                  calendrier semaine (admin, éditable ; extra, lecture seule)
+    planning/                  calendrier semaine (admin, éditable ; extra, lecture seule), demande de remplacement
     hours/                     pointage extra (ClockInOut), tableau/correction admin, récapitulatifs (RecapView/RecapModal)
   lib/
-    supabase/                  clients Supabase (browser, server, proxy, get-profile, require-admin)
-    types.ts                   types partagés (Profile, Shift, InviteCode, TimeEntry, ...)
-    email.ts                   envoi d'emails via Resend
+    supabase/                  clients Supabase (browser, server, proxy, admin, get-profile, require-admin)
+    types.ts                   types partagés (Profile, Shift, InviteCode, TimeEntry, Notification, ...)
+    email.ts                   envoi d'emails via Resend (assignation + rappel)
     date-utils.ts               semaine/mois/dates pour le calendrier et les périodes
     hours-utils.ts              formatage des heures/retards/durées
     monthly-recap.ts            agrégation heures/montant par extra et par période
   proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
-  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire + RLS)
+  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire, notifications + RLS)
+vercel.json                    planification du rappel quotidien (Vercel Cron)
 ```
 
 ## Identité visuelle
@@ -132,5 +155,6 @@ Palette « nature sobre » définie dans [`src/app/globals.css`](src/app/globals
 ## Déploiement sur Vercel
 
 1. Importez le dépôt dans Vercel.
-2. Renseignez les mêmes variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`) dans **Project Settings > Environment Variables**.
+2. Renseignez les mêmes variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`) dans **Project Settings > Environment Variables**.
 3. Ajoutez l'URL de production Vercel dans les **Redirect URLs** du projet Supabase (voir étape 6 ci-dessus).
+4. Le cron défini dans `vercel.json` s'active automatiquement au déploiement (vérifiable dans l'onglet **Cron Jobs** du projet Vercel).

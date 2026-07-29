@@ -29,9 +29,14 @@ export function ExtraShiftCard({
             {shift.heure_debut.slice(0, 5)} – {shift.heure_fin.slice(0, 5)}
           </p>
         </div>
-        <Badge variant={SHIFT_STATUS_BADGE[shift.statut]}>
-          {SHIFT_STATUS_LABELS[shift.statut]}
-        </Badge>
+        <div className="flex flex-col items-end gap-1.5">
+          <Badge variant={SHIFT_STATUS_BADGE[shift.statut]}>
+            {SHIFT_STATUS_LABELS[shift.statut]}
+          </Badge>
+          {shift.remplacement_demande && (
+            <Badge variant="warning">Remplacement demandé</Badge>
+          )}
+        </div>
       </div>
       <div className="mt-4 flex flex-col gap-1 text-sm text-foreground">
         <p>{shift.poste}</p>

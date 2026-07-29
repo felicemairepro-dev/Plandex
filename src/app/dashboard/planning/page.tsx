@@ -26,7 +26,7 @@ export default async function PlanningPage() {
     supabase
       .from("shifts")
       .select(
-        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
+        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, remplacement_demande, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
       )
       .order("date")
       .order("heure_debut")

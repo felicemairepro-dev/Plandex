@@ -72,6 +72,11 @@ export async function createShift(
     });
   }
 
+  await supabase.from("notifications").insert({
+    user_id: fields.extra_id,
+    message: `Nouveau créneau assigné le ${new Date(`${fields.date}T00:00:00`).toLocaleDateString("fr-FR")} (${fields.poste})`,
+  });
+
   revalidatePath("/dashboard/planning");
   revalidatePath("/dashboard");
   return { success: true };
@@ -91,10 +96,27 @@ export async function updateShift(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("shifts").update(fields).eq("id", id);
+
+  const { data: previousShift } = await supabase
+    .from("shifts")
+    .select("extra_id, remplacement_demande")
+    .eq("id", id)
+    .single<{ extra_id: string; remplacement_demande: boolean }>();
+
+  const { error } = await supabase
+    .from("shifts")
+    .update({ ...fields, remplacement_demande: false })
+    .eq("id", id);
 
   if (error) {
     return { error: "Impossible de modifier ce créneau." };
+  }
+
+  if (previousShift?.remplacement_demande) {
+    await supabase.from("notifications").insert({
+      user_id: previousShift.extra_id,
+      message: `Votre demande de remplacement pour le créneau du ${new Date(`${fields.date}T00:00:00`).toLocaleDateString("fr-FR")} a été traitée.`,
+    });
   }
 
   revalidatePath("/dashboard/planning");
@@ -108,7 +130,7 @@ export async function cancelShift(id: string) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("shifts")
-    .update({ statut: "annule" satisfies ShiftStatus })
+    .update({ statut: "annule" satisfies ShiftStatus, remplacement_demande: false })
     .eq("id", id);
 
   if (error) {

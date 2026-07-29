@@ -28,6 +28,7 @@ export interface Shift {
   statut: ShiftStatus;
   cree_par: string;
   cree_le: string;
+  remplacement_demande: boolean;
 }
 
 export interface ShiftWithExtra extends Shift {
@@ -59,4 +60,12 @@ export interface TimeEntryWithShift extends TimeEntry {
     "date" | "heure_debut" | "heure_fin" | "poste" | "lieu"
   > | null;
   extra: Pick<Profile, "id" | "full_name"> | null;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  message: string;
+  lu: boolean;
+  cree_le: string;
 }
