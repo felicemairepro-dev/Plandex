@@ -17,7 +17,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_admin(auth.uid()) and new.taux_horaire is distinct from old.taux_horaire then
+  if auth.uid() is not null and not public.is_admin(auth.uid())
+     and new.taux_horaire is distinct from old.taux_horaire then
     raise exception 'Seul un administrateur peut modifier le taux horaire.';
   end if;
   return new;

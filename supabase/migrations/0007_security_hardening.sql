@@ -18,7 +18,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_admin(auth.uid()) then
+  -- auth.uid() est NULL en dehors d'une requête PostgREST authentifiée
+  -- (SQL Editor, service_role, migrations...) : ces contextes sont déjà
+  -- des accès de confiance (compte propriétaire du projet, clé secrète
+  -- serveur) et ne doivent pas être bloqués. Seul un utilisateur
+  -- authentifié non-admin (auth.uid() renseigné, is_admin() faux) est visé.
+  if auth.uid() is not null and not public.is_admin(auth.uid()) then
     if new.role is distinct from old.role then
       raise exception 'Seul un administrateur peut modifier le rôle.';
     end if;
