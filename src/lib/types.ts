@@ -1,7 +1,34 @@
 export type UserRole = "admin" | "extra";
 
+export interface ActionResult {
+  error?: string;
+  success?: boolean;
+}
+
 export interface Profile {
   id: string;
   full_name: string | null;
+  email: string | null;
+  phone: string | null;
   role: UserRole;
+  actif: boolean;
+}
+
+export type ShiftStatus = "propose" | "confirme" | "annule";
+
+export interface Shift {
+  id: string;
+  date: string;
+  heure_debut: string;
+  heure_fin: string;
+  lieu: string;
+  poste: string;
+  extra_id: string;
+  statut: ShiftStatus;
+  cree_par: string;
+  cree_le: string;
+}
+
+export interface ShiftWithExtra extends Shift {
+  extra: Pick<Profile, "id" | "full_name" | "email"> | null;
 }

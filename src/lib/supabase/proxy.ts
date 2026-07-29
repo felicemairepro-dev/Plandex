@@ -43,6 +43,21 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (user && !isPublicPath(request.nextUrl.pathname)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("actif")
+      .eq("id", user.id)
+      .single<{ actif: boolean }>();
+
+    if (profile && !profile.actif) {
+      await supabase.auth.signOut();
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("erreur", "compte_desactive");
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   if (user && request.nextUrl.pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

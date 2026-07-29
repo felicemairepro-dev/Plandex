@@ -12,7 +12,11 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.get("erreur") === "compte_desactive"
+      ? "Ce compte a été désactivé. Contactez votre administrateur."
+      : null
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -21,13 +25,28 @@ export function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword(
+      {
+        email,
+        password,
+      }
+    );
 
     if (signInError) {
       setError("Email ou mot de passe incorrect.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("actif")
+      .eq("id", data.user.id)
+      .single<{ actif: boolean }>();
+
+    if (profile && !profile.actif) {
+      await supabase.auth.signOut();
+      setError("Ce compte a été désactivé. Contactez votre administrateur.");
       setLoading(false);
       return;
     }

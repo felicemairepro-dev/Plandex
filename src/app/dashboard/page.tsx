@@ -1,50 +1,85 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/supabase/get-profile";
 import { Card } from "@/components/ui/Card";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-import type { Profile } from "@/lib/types";
+import { ExtraShiftCard } from "@/components/planning/ExtraShiftCard";
+import type { Shift } from "@/lib/types";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, profile } = await getProfile();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name, role")
-    .eq("id", user.id)
-    .single<Profile>();
+  const firstName = profile?.full_name?.split(" ")[0] || user.email;
 
-  const firstName = profile?.full_name?.split(" ")[0] ?? user.email;
-  const spaceLabel =
-    profile?.role === "admin" ? "Espace Administrateur" : "Mon espace";
+  if (profile?.role === "admin") {
+    return (
+      <Card>
+        <h1 className="text-2xl font-semibold text-foreground">
+          Bienvenue, {firstName}
+        </h1>
+        <p className="mt-2 text-sm text-muted">
+          Retrouvez votre équipe et le planning dans le menu ci-dessus.
+        </p>
+      </Card>
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: shifts } = await supabase
+    .from("shifts")
+    .select("id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le")
+    .eq("extra_id", user.id)
+    .order("date")
+    .order("heure_debut")
+    .returns<Shift[]>();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (shifts ?? []).filter((shift) => shift.date >= today);
+  const past = (shifts ?? [])
+    .filter((shift) => shift.date < today)
+    .reverse();
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <header className="flex items-center justify-between">
-          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-            {spaceLabel}
-          </span>
-          <LogoutButton />
-        </header>
-
-        <Card>
-          <h1 className="text-2xl font-semibold text-foreground">
-            Bienvenue, {firstName}
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            Votre tableau de bord est prêt. Les prochaines fonctionnalités
-            (planning, badgage) apparaîtront ici.
-          </p>
-        </Card>
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">
+          Bienvenue, {firstName}
+        </h1>
+        <p className="mt-1 text-sm text-muted">Voici votre planning.</p>
       </div>
-    </main>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          À venir
+        </h2>
+        {upcoming.length === 0 ? (
+          <Card>
+            <p className="text-sm text-muted">Aucun créneau à venir.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {upcoming.map((shift) => (
+              <ExtraShiftCard key={shift.id} shift={shift} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {past.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Passés
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {past.map((shift) => (
+              <ExtraShiftCard key={shift.id} shift={shift} />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
