@@ -26,6 +26,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    - [`supabase/migrations/0001_profiles.sql`](supabase/migrations/0001_profiles.sql) — table `profiles` (rôle `admin`/`extra`) et ses policies RLS.
    - [`supabase/migrations/0002_team_and_shifts.sql`](supabase/migrations/0002_team_and_shifts.sql) — ajoute `email`, `phone`, `actif` à `profiles`, et crée la table `shifts` (créneaux) : un `extra` ne voit que ses propres créneaux, un `admin` voit et gère tout.
    - [`supabase/migrations/0003_invite_codes.sql`](supabase/migrations/0003_invite_codes.sql) — table `invite_codes` et les fonctions qui gèrent leur génération/validation/consommation (voir plus bas).
+   - [`supabase/migrations/0004_time_entries.sql`](supabase/migrations/0004_time_entries.sql) — table `time_entries` (badgage) et les fonctions `clock_in`/`clock_out` (voir "Badgage" plus bas).
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
@@ -63,7 +64,13 @@ Un admin peut ensuite modifier les informations d'un extra ou désactiver son co
 
 ## Planning
 
-Depuis `/dashboard/planning` (admin), chaque créneau créé envoie un email à l'extra concerné (si `RESEND_API_KEY` est configuré) et apparaît immédiatement dans son tableau de bord (`/dashboard`), RLS oblige : un extra ne voit jamais que ses propres créneaux.
+`/dashboard/planning` (admin) affiche un vrai calendrier semaine (jours en colonnes, heures en axe, créneaux positionnés et colorés par statut — vert confirmé, orange proposé, gris annulé), avec navigation semaine précédente/suivante. Cliquer sur un créneau ouvre le formulaire de modification ; chaque créneau créé envoie un email à l'extra concerné (si `RESEND_API_KEY` est configuré) et apparaît immédiatement dans son tableau de bord (`/dashboard`), RLS oblige : un extra ne voit jamais que ses propres créneaux.
+
+## Badgage (pointage des heures)
+
+Sur `/dashboard` (vue extra), chaque créneau du jour même affiche de grands boutons **Pointer l'arrivée** / **Pointer le départ**. L'heure enregistrée est **toujours l'heure serveur** au moment du clic : les boutons appellent les fonctions Postgres `clock_in`/`clock_out` (SECURITY DEFINER), qui utilisent `now()` côté base de données — aucune heure envoyée par le client n'est jamais prise en compte, et `clock_in` refuse tout créneau dont la date n'est pas celle du jour.
+
+Sur `/dashboard/hours` (admin), tableau de tous les pointages avec filtres période (semaine/mois) et extra, mise en évidence orange des retards de plus de 15 minutes, export CSV, et correction manuelle (bouton **Corriger** — la ligne est alors marquée « Corrigé » pour garder la traçabilité). Chaque fiche extra (`/dashboard/team`) a aussi un bouton **Historique des heures**.
 
 ## Développement local
 
@@ -87,21 +94,25 @@ src/
     auth/confirm/               route d'échange du lien email Supabase
     dashboard/                  tableau de bord (protégé, différent admin/extra)
     dashboard/team/             gestion de l'équipe + codes d'invitation (admin)
-    dashboard/planning/         gestion des créneaux (admin)
+    dashboard/planning/         calendrier des créneaux (admin)
+    dashboard/hours/            tableau des pointages + export CSV (admin)
   components/
-    ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo)
+    ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo, Modal)
     auth/                      formulaires d'authentification
     join/                      flux d'auto-inscription (code puis formulaire)
     dashboard/                 navigation du tableau de bord
     team/                      liste des extras + panneau de codes d'invitation
-    planning/                  vue planning admin + cartes de créneaux extra
+    planning/                  calendrier semaine admin + cartes de créneaux extra
+    hours/                     pointage extra (ClockInOut) + tableau et correction admin
   lib/
     supabase/                  clients Supabase (browser, server, proxy, get-profile, require-admin)
-    types.ts                   types partagés (Profile, Shift, InviteCode, ...)
+    types.ts                   types partagés (Profile, Shift, InviteCode, TimeEntry, ...)
     email.ts                   envoi d'emails via Resend
+    date-utils.ts               semaine/dates pour le calendrier et les périodes
+    hours-utils.ts              formatage des heures/retards/durées
   proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
-  migrations/                  migrations SQL (profiles, shifts, invite_codes + RLS)
+  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries + RLS)
 ```
 
 ## Identité visuelle

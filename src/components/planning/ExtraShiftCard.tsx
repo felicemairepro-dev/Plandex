@@ -11,7 +11,13 @@ function formatDate(date: string) {
   });
 }
 
-export function ExtraShiftCard({ shift }: { shift: Shift }) {
+export function ExtraShiftCard({
+  shift,
+  children,
+}: {
+  shift: Shift;
+  children?: React.ReactNode;
+}) {
   return (
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
@@ -31,6 +37,7 @@ export function ExtraShiftCard({ shift }: { shift: Shift }) {
         <p>{shift.poste}</p>
         <p className="text-muted">{shift.lieu}</p>
       </div>
+      {children}
     </Card>
   );
 }

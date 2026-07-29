@@ -1,10 +1,10 @@
 import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
-import { WeekCalendar } from "@/components/planning/WeekCalendar";
-import type { Profile, ShiftWithExtra } from "@/lib/types";
+import { HoursTable } from "@/components/hours/HoursTable";
+import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
-export default async function PlanningPage() {
+export default async function HoursPage() {
   const { profile } = await getProfile();
 
   if (profile?.role !== "admin") {
@@ -22,20 +22,18 @@ export default async function PlanningPage() {
 
   const supabase = await createClient();
 
-  const [{ data: shifts }, { data: extras }] = await Promise.all([
+  const [{ data: entries }, { data: extras }] = await Promise.all([
     supabase
-      .from("shifts")
+      .from("time_entries")
       .select(
-        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
+        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
       )
-      .order("date")
-      .order("heure_debut")
-      .returns<ShiftWithExtra[]>(),
+      .order("cree_le", { ascending: false })
+      .returns<TimeEntryWithShift[]>(),
     supabase
       .from("profiles")
       .select("id, full_name, email, phone, role, actif")
       .eq("role", "extra")
-      .eq("actif", true)
       .order("full_name")
       .returns<Profile[]>(),
   ]);
@@ -43,13 +41,13 @@ export default async function PlanningPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Planning</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Heures</h1>
         <p className="mt-1 text-sm text-muted">
-          Créez et gérez les créneaux de vos extras.
+          Pointages de l&apos;équipe, filtrables par période et par extra.
         </p>
       </div>
 
-      <WeekCalendar shifts={shifts ?? []} extras={extras ?? []} />
+      <HoursTable entries={entries ?? []} extras={extras ?? []} />
     </div>
   );
 }

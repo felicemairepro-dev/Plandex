@@ -41,3 +41,21 @@ export interface InviteCode {
   cree_le: string;
   expire_le: string | null;
 }
+
+export interface TimeEntry {
+  id: string;
+  shift_id: string;
+  extra_id: string;
+  heure_arrivee: string | null;
+  heure_depart: string | null;
+  corrige_par_admin: boolean;
+  cree_le: string;
+}
+
+export interface TimeEntryWithShift extends TimeEntry {
+  shift: Pick<
+    Shift,
+    "date" | "heure_debut" | "heure_fin" | "poste" | "lieu"
+  > | null;
+  extra: Pick<Profile, "id" | "full_name"> | null;
+}

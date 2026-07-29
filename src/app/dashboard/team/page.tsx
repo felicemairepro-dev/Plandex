@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
 import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
-import type { InviteCode, Profile } from "@/lib/types";
+import type { InviteCode, Profile, TimeEntryWithShift } from "@/lib/types";
 
 export default async function TeamPage() {
   const { profile } = await getProfile();
@@ -23,19 +23,34 @@ export default async function TeamPage() {
 
   const supabase = await createClient();
 
-  const [{ data: extras }, { data: codes }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, role, actif")
-      .eq("role", "extra")
-      .order("full_name")
-      .returns<Profile[]>(),
-    supabase
-      .from("invite_codes")
-      .select("id, code, utilise, cree_par, cree_le, expire_le")
-      .order("cree_le", { ascending: false })
-      .returns<InviteCode[]>(),
-  ]);
+  const [{ data: extras }, { data: codes }, { data: timeEntries }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, role, actif")
+        .eq("role", "extra")
+        .order("full_name")
+        .returns<Profile[]>(),
+      supabase
+        .from("invite_codes")
+        .select("id, code, utilise, cree_par, cree_le, expire_le")
+        .order("cree_le", { ascending: false })
+        .returns<InviteCode[]>(),
+      supabase
+        .from("time_entries")
+        .select(
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+        )
+        .order("cree_le", { ascending: false })
+        .returns<TimeEntryWithShift[]>(),
+    ]);
+
+  const historyByExtraId = new Map<string, TimeEntryWithShift[]>();
+  for (const entry of timeEntries ?? []) {
+    const list = historyByExtraId.get(entry.extra_id) ?? [];
+    list.push(entry);
+    historyByExtraId.set(entry.extra_id, list);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,7 +62,10 @@ export default async function TeamPage() {
       </div>
 
       <InviteCodesPanel codes={codes ?? []} />
-      <TeamList extras={extras ?? []} />
+      <TeamList
+        extras={extras ?? []}
+        historyByExtraId={Object.fromEntries(historyByExtraId)}
+      />
     </div>
   );
 }

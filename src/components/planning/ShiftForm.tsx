@@ -31,6 +31,20 @@ export function ShiftForm({
     if (state.success) onDone();
   }
 
+  // Un créneau existant peut être assigné à un extra depuis désactivé :
+  // on l'ajoute quand même à la liste pour ne pas le remplacer par erreur.
+  const extraOptions =
+    shift?.extra && !extras.some((e) => e.id === shift.extra_id)
+      ? [
+          {
+            id: shift.extra_id,
+            full_name: `${shift.extra.full_name || shift.extra.email} (inactif)`,
+            email: shift.extra.email,
+          },
+          ...extras,
+        ]
+      : extras;
+
   return (
     <Card>
       <h2 className="text-lg font-semibold text-foreground">
@@ -96,7 +110,7 @@ export function ShiftForm({
             <option value="" disabled>
               Sélectionner un extra
             </option>
-            {extras.map((extra) => (
+            {extraOptions.map((extra) => (
               <option key={extra.id} value={extra.id}>
                 {extra.full_name || extra.email}
               </option>

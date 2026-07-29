@@ -7,6 +7,7 @@ import { clsx } from "@/lib/utils";
 const ADMIN_LINKS = [
   { href: "/dashboard", label: "Tableau de bord" },
   { href: "/dashboard/planning", label: "Planning" },
+  { href: "/dashboard/hours", label: "Heures" },
   { href: "/dashboard/team", label: "Équipe" },
 ];
 

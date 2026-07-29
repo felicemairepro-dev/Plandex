@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/supabase/get-profile";
 import { Card } from "@/components/ui/Card";
 import { ExtraShiftCard } from "@/components/planning/ExtraShiftCard";
-import type { Shift } from "@/lib/types";
+import { ClockInOut } from "@/components/hours/ClockInOut";
+import type { Shift, TimeEntry } from "@/lib/types";
 
 export default async function DashboardPage() {
   const { user, profile } = await getProfile();
@@ -28,13 +29,26 @@ export default async function DashboardPage() {
   }
 
   const supabase = await createClient();
-  const { data: shifts } = await supabase
-    .from("shifts")
-    .select("id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le")
-    .eq("extra_id", user.id)
-    .order("date")
-    .order("heure_debut")
-    .returns<Shift[]>();
+  const [{ data: shifts }, { data: timeEntries }] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select(
+        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le"
+      )
+      .eq("extra_id", user.id)
+      .order("date")
+      .order("heure_debut")
+      .returns<Shift[]>(),
+    supabase
+      .from("time_entries")
+      .select("*")
+      .eq("extra_id", user.id)
+      .returns<TimeEntry[]>(),
+  ]);
+
+  const entriesByShiftId = new Map(
+    (timeEntries ?? []).map((entry) => [entry.shift_id, entry])
+  );
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (shifts ?? []).filter((shift) => shift.date >= today);
@@ -62,7 +76,14 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {upcoming.map((shift) => (
-              <ExtraShiftCard key={shift.id} shift={shift} />
+              <ExtraShiftCard key={shift.id} shift={shift}>
+                {shift.date === today && (
+                  <ClockInOut
+                    shift={shift}
+                    entry={entriesByShiftId.get(shift.id) ?? null}
+                  />
+                )}
+              </ExtraShiftCard>
             ))}
           </div>
         )}
