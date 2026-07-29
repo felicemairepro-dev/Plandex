@@ -29,6 +29,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    - [`supabase/migrations/0004_time_entries.sql`](supabase/migrations/0004_time_entries.sql) — table `time_entries` (badgage) et les fonctions `clock_in`/`clock_out` (voir "Badgage" plus bas).
    - [`supabase/migrations/0005_taux_horaire.sql`](supabase/migrations/0005_taux_horaire.sql) — ajoute `taux_horaire` à `profiles`, modifiable uniquement par un admin (trigger dédié).
    - [`supabase/migrations/0006_swaps_and_notifications.sql`](supabase/migrations/0006_swaps_and_notifications.sql) — ajoute `remplacement_demande` à `shifts`, la fonction `request_shift_replacement`, et la table `notifications` (voir "Échanges de créneaux" plus bas).
+   - [`supabase/migrations/0007_security_hardening.sql`](supabase/migrations/0007_security_hardening.sql) — corrige une faille : sans ce trigger, un extra pouvait modifier son propre `role`/`actif` via un appel direct à l'API REST (voir "Sécurité" plus bas). **Important si vous avez déployé avant cette migration.**
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
@@ -102,6 +103,21 @@ Depuis un créneau **confirmé à venir** sur son tableau de bord, un extra peut
 
 La cloche de notifications dans le header (table `notifications`, RLS : chacun ne voit que les siennes) liste ces évènements — nouveau créneau assigné, remplacement demandé (admin), remplacement traité (extra) — avec un compteur nouveaux non lus ; cliquer une notification la marque comme lue.
 
+## Statistiques
+
+`/dashboard/stats` (admin) affiche le nombre d'heures travaillées par mois sur les 6 derniers mois (graphique en barres, recharts), un classement des extras par heures effectuées sur une période sélectionnable (semaine/mois), et le taux de ponctualité global (part des pointages sans retard significatif, ≤ 15 min).
+
+## Réglages
+
+`/dashboard/settings` permet à n'importe quel utilisateur connecté (admin ou extra) de modifier son propre prénom/nom/téléphone et son mot de passe. L'email n'est pas modifiable depuis cette page.
+
+## Sécurité
+
+- **Row Level Security** sur toutes les tables : un `extra` ne peut lire/modifier que ses propres lignes (`profiles`, `shifts`, `time_entries`, `notifications`) ; toute action nécessitant un privilège admin est vérifiée côté serveur (`requireAdmin()`), jamais seulement cachée côté interface.
+- Les opérations sensibles à l'horodatage (`clock_in`/`clock_out`) ou à usage unique (`claim_invite_code`) passent par des fonctions Postgres `SECURITY DEFINER` plutôt que par des policies RLS classiques, pour garantir qu'elles ne peuvent pas être contournées par un appel direct à l'API.
+- La migration [`0007_security_hardening.sql`](supabase/migrations/0007_security_hardening.sql) corrige un point trouvé lors d'un audit : la policy `profiles_update_own` (migration 0001) autorisait déjà un utilisateur à modifier sa propre ligne `profiles`, mais sans empêcher un changement des colonnes `role`/`actif` — un extra aurait pu, via un appel direct à l'API REST Supabase (en dehors de l'application), s'auto-promouvoir admin ou se réactiver après désactivation. Un trigger bloque désormais ces deux colonnes pour tout utilisateur non-admin (le trigger équivalent pour `taux_horaire` existait déjà depuis la migration 0005). **Si vous avez déjà déployé ce projet avant cette migration, exécutez-la sans attendre.**
+- `src/proxy.ts` protège toutes les routes par défaut (session requise) sauf celles listées explicitement dans `PUBLIC_PATHS` (`/lib/supabase/proxy.ts`), dont `/api` — les routes API gèrent leur propre autorisation (ex. `CRON_SECRET` pour `/api/cron/reminders`).
+
 ## Développement local
 
 ```bash
@@ -127,14 +143,18 @@ src/
     dashboard/team/             gestion de l'équipe + codes d'invitation (admin)
     dashboard/planning/         calendrier des créneaux (admin)
     dashboard/hours/            tableau des pointages + export CSV (admin)
+    dashboard/stats/            graphique et classement (admin)
+    dashboard/settings/         profil et mot de passe (tous)
   components/
-    ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo, Modal)
+    ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo, Modal, Skeleton, EmptyState)
     auth/                      formulaires d'authentification
     join/                      flux d'auto-inscription (code puis formulaire)
     dashboard/                 navigation, cloche de notifications, onglets du tableau de bord extra
     team/                      liste des extras + panneau de codes d'invitation
     planning/                  calendrier semaine (admin, éditable ; extra, lecture seule), demande de remplacement
     hours/                     pointage extra (ClockInOut), tableau/correction admin, récapitulatifs (RecapView/RecapModal)
+    stats/                     graphique et classement (StatsView)
+    settings/                  formulaires profil/mot de passe
   lib/
     supabase/                  clients Supabase (browser, server, proxy, admin, get-profile, require-admin)
     types.ts                   types partagés (Profile, Shift, InviteCode, TimeEntry, Notification, ...)
@@ -144,7 +164,7 @@ src/
     monthly-recap.ts            agrégation heures/montant par extra et par période
   proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
-  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire, notifications + RLS)
+  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire, notifications, sécurité + RLS)
 vercel.json                    planification du rappel quotidien (Vercel Cron)
 ```
 

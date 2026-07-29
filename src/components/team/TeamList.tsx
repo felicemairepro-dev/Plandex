@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ExtraRow } from "@/components/team/ExtraRow";
 import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
@@ -12,9 +13,10 @@ export function TeamList({
   return (
     <Card>
       {extras.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">
-          Aucun extra pour le moment.
-        </p>
+        <EmptyState
+          title="Aucun extra pour le moment"
+          description="Générez un code d'invitation ci-dessus pour ajouter votre premier extra."
+        />
       ) : (
         extras.map((extra) => (
           <ExtraRow

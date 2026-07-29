@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ExtraShiftCard } from "@/components/planning/ExtraShiftCard";
 import { ClockInOut } from "@/components/hours/ClockInOut";
 import { RequestReplacementButton } from "@/components/planning/RequestReplacementButton";
@@ -68,7 +69,10 @@ export function ExtraDashboardTabs({
             </h2>
             {upcoming.length === 0 ? (
               <Card>
-                <p className="text-sm text-muted">Aucun créneau à venir.</p>
+                <EmptyState
+                  title="Aucun créneau à venir"
+                  description="Votre prochain créneau apparaîtra ici dès qu'un admin vous l'aura assigné."
+                />
               </Card>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">

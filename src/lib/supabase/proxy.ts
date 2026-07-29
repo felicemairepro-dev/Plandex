@@ -8,6 +8,9 @@ const PUBLIC_PATHS = [
   "/rejoindre",
   "/auth",
   "/apercu",
+  // Les routes API gèrent elles-mêmes leur autorisation (ex: CRON_SECRET
+  // pour /api/cron/*) — elles n'ont pas de session utilisateur à vérifier.
+  "/api",
 ];
 
 // Marketing/auth pages a logged-in user should be bounced away from.

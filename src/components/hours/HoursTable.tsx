@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { CorrectionForm } from "@/components/hours/CorrectionForm";
 import {
   addDays,
@@ -271,8 +272,11 @@ export function HoursTable({
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted">
-                    Aucun pointage sur cette période.
+                  <td colSpan={8}>
+                    <EmptyState
+                      title="Aucun pointage sur cette période"
+                      description="Changez de période ou d'extra pour voir d'autres résultats."
+                    />
                   </td>
                 </tr>
               ) : (
