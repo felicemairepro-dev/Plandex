@@ -33,7 +33,7 @@ export default async function PlanningPage() {
       .returns<ShiftWithExtra[]>(),
     supabase
       .from("profiles")
-      .select("id, full_name, email, phone, role, actif")
+      .select("id, full_name, email, phone, role, actif, taux_horaire")
       .eq("role", "extra")
       .eq("actif", true)
       .order("full_name")

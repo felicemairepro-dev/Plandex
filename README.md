@@ -27,6 +27,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    - [`supabase/migrations/0002_team_and_shifts.sql`](supabase/migrations/0002_team_and_shifts.sql) — ajoute `email`, `phone`, `actif` à `profiles`, et crée la table `shifts` (créneaux) : un `extra` ne voit que ses propres créneaux, un `admin` voit et gère tout.
    - [`supabase/migrations/0003_invite_codes.sql`](supabase/migrations/0003_invite_codes.sql) — table `invite_codes` et les fonctions qui gèrent leur génération/validation/consommation (voir plus bas).
    - [`supabase/migrations/0004_time_entries.sql`](supabase/migrations/0004_time_entries.sql) — table `time_entries` (badgage) et les fonctions `clock_in`/`clock_out` (voir "Badgage" plus bas).
+   - [`supabase/migrations/0005_taux_horaire.sql`](supabase/migrations/0005_taux_horaire.sql) — ajoute `taux_horaire` à `profiles`, modifiable uniquement par un admin (trigger dédié).
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
@@ -70,7 +71,15 @@ Un admin peut ensuite modifier les informations d'un extra ou désactiver son co
 
 Sur `/dashboard` (vue extra), chaque créneau du jour même affiche de grands boutons **Pointer l'arrivée** / **Pointer le départ**. L'heure enregistrée est **toujours l'heure serveur** au moment du clic : les boutons appellent les fonctions Postgres `clock_in`/`clock_out` (SECURITY DEFINER), qui utilisent `now()` côté base de données — aucune heure envoyée par le client n'est jamais prise en compte, et `clock_in` refuse tout créneau dont la date n'est pas celle du jour.
 
-Sur `/dashboard/hours` (admin), tableau de tous les pointages avec filtres période (semaine/mois) et extra, mise en évidence orange des retards de plus de 15 minutes, export CSV, et correction manuelle (bouton **Corriger** — la ligne est alors marquée « Corrigé » pour garder la traçabilité). Chaque fiche extra (`/dashboard/team`) a aussi un bouton **Historique des heures**.
+Sur `/dashboard/hours` (admin), tableau de tous les pointages avec filtres période (semaine/mois) et extra, mise en évidence orange des retards de plus de 15 minutes, export CSV (avec taux horaire et montant estimé), et correction manuelle (bouton **Corriger** — la ligne est alors marquée « Corrigé » pour garder la traçabilité). Un récapitulatif synthétique par extra (heures totales, créneaux effectués, montant estimé) apparaît en haut de page pour la période sélectionnée.
+
+## Récapitulatif mensuel & facturation indicative
+
+Chaque extra a un **taux horaire** optionnel (`profiles.taux_horaire`, en €), modifiable uniquement par un admin depuis `/dashboard/team` — il ne sert qu'à estimer un montant, aucun paiement n'est déclenché. Depuis la fiche d'un extra, le bouton **Générer le récapitulatif du mois** ouvre le détail des créneaux du mois (heures prévues/réelles, durée, total, montant estimé) avec un bouton **Télécharger en PDF** (ouvre la boîte d'impression du navigateur sur une mise en page épurée — "Enregistrer en PDF"). Ce document sert de base pour que l'extra établisse sa propre facture, ce n'est pas une facture officielle Plandex. Chaque extra retrouve le même récapitulatif, pour lui-même uniquement, dans l'onglet **Mes heures** de son tableau de bord.
+
+## Tableau de bord extra
+
+`/dashboard` (vue extra) est organisé en 3 onglets : **Planning** (créneaux à venir/passés, pointage sur les créneaux du jour), **Calendrier** (même calendrier semaine que la vue admin, mais en lecture seule et filtré à ses propres créneaux — un extra ne voit jamais le planning d'un autre), **Mes heures** (récapitulatif mensuel personnel).
 
 ## Développement local
 
@@ -100,19 +109,20 @@ src/
     ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo, Modal)
     auth/                      formulaires d'authentification
     join/                      flux d'auto-inscription (code puis formulaire)
-    dashboard/                 navigation du tableau de bord
+    dashboard/                 navigation + onglets du tableau de bord extra
     team/                      liste des extras + panneau de codes d'invitation
-    planning/                  calendrier semaine admin + cartes de créneaux extra
-    hours/                     pointage extra (ClockInOut) + tableau et correction admin
+    planning/                  calendrier semaine (admin, éditable ; extra, lecture seule)
+    hours/                     pointage extra (ClockInOut), tableau/correction admin, récapitulatifs (RecapView/RecapModal)
   lib/
     supabase/                  clients Supabase (browser, server, proxy, get-profile, require-admin)
     types.ts                   types partagés (Profile, Shift, InviteCode, TimeEntry, ...)
     email.ts                   envoi d'emails via Resend
-    date-utils.ts               semaine/dates pour le calendrier et les périodes
+    date-utils.ts               semaine/mois/dates pour le calendrier et les périodes
     hours-utils.ts              formatage des heures/retards/durées
+    monthly-recap.ts            agrégation heures/montant par extra et par période
   proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
-  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries + RLS)
+  migrations/                  migrations SQL (profiles, shifts, invite_codes, time_entries, taux_horaire + RLS)
 ```
 
 ## Identité visuelle

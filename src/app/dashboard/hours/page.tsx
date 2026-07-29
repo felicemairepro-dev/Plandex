@@ -32,7 +32,7 @@ export default async function HoursPage() {
       .returns<TimeEntryWithShift[]>(),
     supabase
       .from("profiles")
-      .select("id, full_name, email, phone, role, actif")
+      .select("id, full_name, email, phone, role, actif, taux_horaire")
       .eq("role", "extra")
       .order("full_name")
       .returns<Profile[]>(),

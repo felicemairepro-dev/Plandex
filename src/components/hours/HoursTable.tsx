@@ -7,26 +7,29 @@ import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { CorrectionForm } from "@/components/hours/CorrectionForm";
-import { addDays, getWeekStart, toISODate } from "@/lib/date-utils";
+import {
+  addDays,
+  getMonthEnd,
+  getMonthStart,
+  getWeekStart,
+  toISODate,
+} from "@/lib/date-utils";
 import {
   formatLocalTime,
   getDurationLabel,
   getLateMinutes,
 } from "@/lib/hours-utils";
+import {
+  buildRecapByExtra,
+  estimateAmount,
+  formatHoursLabel,
+} from "@/lib/monthly-recap";
 import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
 const PAGE_SIZE = 15;
 const LATE_THRESHOLD_MINUTES = 15;
 
 type PeriodType = "semaine" | "mois";
-
-function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function getMonthEnd(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
 
 function getPeriodRange(referenceDate: Date, periodType: PeriodType) {
   if (periodType === "semaine") {
@@ -81,6 +84,11 @@ export function HoursTable({
     })
     .toSorted((a, b) => (a.shift!.date < b.shift!.date ? -1 : 1));
 
+  const tauxHoraireByExtraId = new Map(
+    extras.map((extra) => [extra.id, extra.taux_horaire])
+  );
+  const recap = buildRecapByExtra(filtered, tauxHoraireByExtraId);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
   const pageRows = filtered.slice(
@@ -108,18 +116,35 @@ export function HoursTable({
       "Départ réel",
       "Durée",
       "Corrigé manuellement",
+      "Taux horaire (€)",
+      "Montant estimé (€)",
     ];
-    const rows = filtered.map((entry) => [
-      entry.extra?.full_name || "",
-      entry.shift?.date || "",
-      entry.shift?.poste || "",
-      entry.shift?.heure_debut.slice(0, 5) || "",
-      entry.shift?.heure_fin.slice(0, 5) || "",
-      formatLocalTime(entry.heure_arrivee),
-      formatLocalTime(entry.heure_depart),
-      getDurationLabel(entry),
-      entry.corrige_par_admin ? "Oui" : "Non",
-    ]);
+    const rows = filtered.map((entry) => {
+      const tauxHoraire = tauxHoraireByExtraId.get(entry.extra_id) ?? null;
+      const minutes =
+        entry.heure_arrivee && entry.heure_depart
+          ? Math.round(
+              (new Date(entry.heure_depart).getTime() -
+                new Date(entry.heure_arrivee).getTime()) /
+                60000
+            )
+          : 0;
+      const montant = estimateAmount(minutes, tauxHoraire);
+
+      return [
+        entry.extra?.full_name || "",
+        entry.shift?.date || "",
+        entry.shift?.poste || "",
+        entry.shift?.heure_debut.slice(0, 5) || "",
+        entry.shift?.heure_fin.slice(0, 5) || "",
+        formatLocalTime(entry.heure_arrivee),
+        formatLocalTime(entry.heure_depart),
+        getDurationLabel(entry),
+        entry.corrige_par_admin ? "Oui" : "Non",
+        tauxHoraire != null ? tauxHoraire.toFixed(2) : "",
+        montant != null ? montant.toFixed(2) : "",
+      ];
+    });
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => escapeCsv(String(cell))).join(","))
       .join("\n");
@@ -181,6 +206,52 @@ export function HoursTable({
           Exporter en CSV
         </Button>
       </div>
+
+      <Card>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Récapitulatif · {formatPeriodLabel(start, end, periodType)}
+        </h2>
+        {recap.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            Aucune heure pointée sur cette période.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr className="text-xs uppercase tracking-wide text-muted">
+                  <th className="py-1.5 pr-4 font-medium">Extra</th>
+                  <th className="py-1.5 pr-4 font-medium">Heures totales</th>
+                  <th className="py-1.5 pr-4 font-medium">
+                    Créneaux effectués
+                  </th>
+                  <th className="py-1.5 pr-4 font-medium">Montant estimé</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recap.map((row) => (
+                  <tr key={row.extraId}>
+                    <td className="py-1.5 pr-4 font-medium text-foreground">
+                      {row.extraName}
+                    </td>
+                    <td className="py-1.5 pr-4 text-foreground">
+                      {formatHoursLabel(row.totalMinutes)}
+                    </td>
+                    <td className="py-1.5 pr-4 text-foreground">
+                      {row.shiftsCompleted}
+                    </td>
+                    <td className="py-1.5 pr-4 text-foreground">
+                      {row.montantEstime != null
+                        ? `${row.montantEstime.toFixed(2)} €`
+                        : "Taux non renseigné"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card className="p-0">
         <div className="overflow-x-auto">

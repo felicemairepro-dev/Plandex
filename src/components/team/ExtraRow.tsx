@@ -5,6 +5,7 @@ import { updateExtra, toggleExtraActive } from "@/app/dashboard/team/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { RecapModal } from "@/components/hours/RecapModal";
 import { formatLocalTime, getDurationLabel } from "@/lib/hours-utils";
 import type { ActionResult, Profile, TimeEntryWithShift } from "@/lib/types";
 
@@ -19,6 +20,7 @@ export function ExtraRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
   const [state, formAction, pending] = useActionState(
     updateExtra,
     initialState
@@ -55,13 +57,29 @@ export function ExtraRow({
               required
             />
           </div>
-          <Input
-            id={`phone-${extra.id}`}
-            name="phone"
-            type="tel"
-            label="Téléphone"
-            defaultValue={extra.phone ?? ""}
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              id={`phone-${extra.id}`}
+              name="phone"
+              type="tel"
+              label="Téléphone"
+              defaultValue={extra.phone ?? ""}
+            />
+            <Input
+              id={`taux_horaire-${extra.id}`}
+              name="taux_horaire"
+              type="number"
+              step="0.01"
+              min="0"
+              label="Taux horaire (€)"
+              placeholder="Ex: 15.50"
+              defaultValue={extra.taux_horaire ?? ""}
+            />
+          </div>
+          <p className="text-xs text-muted">
+            Sert uniquement à estimer un montant à facturer — aucun paiement
+            n&apos;est déclenché automatiquement.
+          </p>
 
           {state.error && (
             <p className="rounded-xl bg-danger-bg px-3.5 py-2.5 text-sm text-danger">
@@ -95,6 +113,9 @@ export function ExtraRow({
           </p>
           <p className="text-sm text-muted">{extra.email}</p>
           {extra.phone && <p className="text-sm text-muted">{extra.phone}</p>}
+          {extra.taux_horaire != null && (
+            <p className="text-sm text-muted">{extra.taux_horaire} €/h</p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -106,6 +127,9 @@ export function ExtraRow({
             onClick={() => setShowHistory((v) => !v)}
           >
             {showHistory ? "Masquer l'historique" : "Historique des heures"}
+          </Button>
+          <Button variant="secondary" onClick={() => setShowRecap(true)}>
+            Générer le récapitulatif du mois
           </Button>
           <Button variant="secondary" onClick={() => setEditing(true)}>
             Modifier
@@ -160,6 +184,14 @@ export function ExtraRow({
             </ul>
           )}
         </div>
+      )}
+
+      {showRecap && (
+        <RecapModal
+          extra={extra}
+          entries={history}
+          onClose={() => setShowRecap(false)}
+        />
       )}
     </div>
   );

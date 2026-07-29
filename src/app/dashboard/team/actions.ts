@@ -35,9 +35,18 @@ export async function updateExtra(
   const firstName = String(formData.get("firstName") || "").trim();
   const lastName = String(formData.get("lastName") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
+  const tauxHoraireRaw = String(formData.get("taux_horaire") || "").trim();
 
   if (!id || !firstName || !lastName) {
     return { error: "Prénom et nom sont obligatoires." };
+  }
+
+  let tauxHoraire: number | null = null;
+  if (tauxHoraireRaw) {
+    tauxHoraire = Number(tauxHoraireRaw.replace(",", "."));
+    if (Number.isNaN(tauxHoraire) || tauxHoraire < 0) {
+      return { error: "Le taux horaire doit être un nombre positif." };
+    }
   }
 
   const supabase = await createClient();
@@ -46,6 +55,7 @@ export async function updateExtra(
     .update({
       full_name: `${firstName} ${lastName}`.trim(),
       phone: phone || null,
+      taux_horaire: tauxHoraire,
     })
     .eq("id", id);
 

@@ -41,10 +41,12 @@ function formatWeekRange(weekStart: Date) {
 
 export function WeekCalendar({
   shifts,
-  extras,
+  extras = [],
+  readOnly = false,
 }: {
   shifts: ShiftWithExtra[];
-  extras: Profile[];
+  extras?: Profile[];
+  readOnly?: boolean;
 }) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -105,9 +107,11 @@ export function WeekCalendar({
             {formatWeekRange(weekStart)}
           </span>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
-          Créer un créneau
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => setShowCreateForm(true)}>
+            Créer un créneau
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
@@ -180,11 +184,13 @@ export function WeekCalendar({
                     ((endMin - startMin) / 60) * HOUR_HEIGHT
                   );
 
+                  const Block = readOnly ? "div" : "button";
+
                   return (
-                    <button
+                    <Block
                       key={shift.id}
-                      onClick={() => setEditingShift(shift)}
-                      className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow hover:shadow-md ${STATUS_BLOCK_STYLES[shift.statut]}`}
+                      onClick={readOnly ? undefined : () => setEditingShift(shift)}
+                      className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow ${readOnly ? "" : "hover:shadow-md"} ${STATUS_BLOCK_STYLES[shift.statut]}`}
                       style={{ top, height }}
                     >
                       <p className="font-semibold">
@@ -192,10 +198,12 @@ export function WeekCalendar({
                         {shift.heure_fin.slice(0, 5)}
                       </p>
                       <p className="truncate">
-                        {shift.extra?.full_name || shift.extra?.email}
+                        {readOnly
+                          ? shift.lieu
+                          : shift.extra?.full_name || shift.extra?.email}
                       </p>
                       <p className="truncate opacity-80">{shift.poste}</p>
-                    </button>
+                    </Block>
                   );
                 })}
               </div>
