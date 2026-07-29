@@ -1,33 +1,28 @@
-import { Suspense } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
 import { Logo } from "@/components/ui/Logo";
-import { LoginForm } from "@/components/auth/LoginForm";
+import { JoinFlow } from "@/components/join/JoinFlow";
 
-export default function LoginPage() {
+export default function RejoindrePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-accent/5 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <Logo className="mb-4" />
           <h1 className="text-2xl font-semibold text-foreground">
-            Bienvenue
+            Créer mon compte extra
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Connectez-vous pour accéder à votre planning
+            Saisissez le code d&apos;invitation fourni par votre
+            administrateur.
           </p>
         </div>
 
-        <Card>
-          <Suspense fallback={null}>
-            <LoginForm />
-          </Suspense>
-        </Card>
+        <JoinFlow />
 
         <p className="mt-6 text-center text-sm text-muted">
-          Vous êtes administrateur ?{" "}
+          Déjà un compte ?{" "}
           <Link href="/login" className="text-accent hover:text-accent-hover">
-            Connectez-vous ici
+            Connectez-vous
           </Link>
         </p>
       </div>

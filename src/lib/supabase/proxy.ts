@@ -1,12 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/login/mot-de-passe-oublie", "/auth"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/login/mot-de-passe-oublie",
+  "/rejoindre",
+  "/auth",
+  "/apercu",
+];
+
+// Marketing/auth pages a logged-in user should be bounced away from.
+const AUTH_ENTRY_PATHS = ["/", "/login", "/rejoindre"];
+
+function matchesPath(pathname: string, path: string) {
+  if (path === "/") return pathname === "/";
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
 
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
-  );
+  return PUBLIC_PATHS.some((path) => matchesPath(pathname, path));
 }
 
 export async function updateSession(request: NextRequest) {
@@ -58,7 +71,10 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (user && request.nextUrl.pathname === "/login") {
+  if (
+    user &&
+    AUTH_ENTRY_PATHS.some((path) => matchesPath(request.nextUrl.pathname, path))
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

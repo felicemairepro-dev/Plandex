@@ -1,54 +1,28 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/require-admin";
-import type { ActionResult } from "@/lib/types";
+import type { ActionResult, InviteCode } from "@/lib/types";
 
-async function getOrigin() {
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol = host?.startsWith("localhost") ? "http" : "https";
-  return `${protocol}://${host}`;
+interface GenerateCodeResult extends ActionResult {
+  code?: InviteCode;
 }
 
-export async function inviteExtra(
-  _prevState: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
+export async function generateInviteCode(): Promise<GenerateCodeResult> {
   await requireAdmin();
 
-  const firstName = String(formData.get("firstName") || "").trim();
-  const lastName = String(formData.get("lastName") || "").trim();
-  const email = String(formData.get("email") || "").trim();
-  const phone = String(formData.get("phone") || "").trim();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("create_invite_code")
+    .single<InviteCode>();
 
-  if (!firstName || !lastName || !email) {
-    return { error: "Prénom, nom et email sont obligatoires." };
-  }
-
-  const fullName = `${firstName} ${lastName}`.trim();
-  const admin = createAdminClient();
-  const origin = await getOrigin();
-
-  const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName, phone: phone || null, role: "extra" },
-    redirectTo: `${origin}/update-password`,
-  });
-
-  if (error) {
-    return {
-      error:
-        error.code === "email_exists"
-          ? "Un compte existe déjà avec cet email."
-          : "Impossible d'inviter cet extra pour le moment.",
-    };
+  if (error || !data) {
+    return { error: "Impossible de générer un code pour le moment." };
   }
 
   revalidatePath("/dashboard/team");
-  return { success: true };
+  return { success: true, code: data };
 }
 
 export async function updateExtra(

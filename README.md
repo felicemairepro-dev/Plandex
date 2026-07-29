@@ -1,8 +1,8 @@
 # Plandex
 
-Application interne de gestion de planning pour les extras/indépendants. Accès strictement privé (pas de compte public, pas d'inscription libre).
+Application interne de gestion de planning pour les extras/indépendants. Accès privé : les comptes admin sont créés manuellement, les comptes extras s'auto-inscrivent via un code d'invitation à usage unique.
 
-**Stack** : Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (Auth + DB) · Vercel
+**Stack** : Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (Auth + DB) · Resend · Vercel
 
 ## Configuration du projet Supabase
 
@@ -10,7 +10,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
 2. Dans **Project Settings > API**, récupérez :
    - `Project URL`
    - `anon public` key
-3. Copiez `.env.local.example` vers `.env.local` et renseignez ces deux valeurs :
+3. Copiez `.env.local.example` vers `.env.local` et renseignez ces valeurs :
 
    ```bash
    cp .env.local.example .env.local
@@ -19,19 +19,15 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-cle-anon-public
-   SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role
    RESEND_API_KEY=votre-cle-resend
    ```
 
-   La `service_role` key se trouve dans **Project Settings > API** (section "Project API keys"). Elle ne doit **jamais** être exposée au navigateur — elle n'est utilisée que côté serveur pour inviter/gérer les comptes extras.
-
 4. Exécutez les migrations SQL dans **SQL Editor** (dans l'ordre), en collant le contenu de chaque fichier puis en l'exécutant :
-   - [`supabase/migrations/0001_profiles.sql`](supabase/migrations/0001_profiles.sql)
-   - [`supabase/migrations/0002_team_and_shifts.sql`](supabase/migrations/0002_team_and_shifts.sql)
+   - [`supabase/migrations/0001_profiles.sql`](supabase/migrations/0001_profiles.sql) — table `profiles` (rôle `admin`/`extra`) et ses policies RLS.
+   - [`supabase/migrations/0002_team_and_shifts.sql`](supabase/migrations/0002_team_and_shifts.sql) — ajoute `email`, `phone`, `actif` à `profiles`, et crée la table `shifts` (créneaux) : un `extra` ne voit que ses propres créneaux, un `admin` voit et gère tout.
+   - [`supabase/migrations/0003_invite_codes.sql`](supabase/migrations/0003_invite_codes.sql) — table `invite_codes` et les fonctions qui gèrent leur génération/validation/consommation (voir plus bas).
 
-   La première migration crée la table `profiles` (rôle `admin`/`extra`) et ses policies RLS. La seconde ajoute `email`, `phone`, `actif` à `profiles`, et crée la table `shifts` (créneaux de planning) avec ses policies : un `extra` ne voit que ses propres créneaux, un `admin` voit et gère tout.
-
-5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" (et "Invite user", utilisé pour créer les comptes extras) pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet).
+5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
 
 6. Dans **Authentication > URL Configuration**, ajoutez votre URL de développement et de production (ex. `http://localhost:3000`, `https://votre-app.vercel.app`) aux **Redirect URLs**.
 
@@ -39,7 +35,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
 
 ## Créer le premier compte admin
 
-Aucune inscription publique n'existe : les comptes sont créés manuellement (puis, plus tard, depuis une interface d'administration à construire).
+Il n'y a pas d'inscription publique pour les admins : le premier compte se crée manuellement.
 
 1. Dans le dashboard Supabase, allez dans **Authentication > Users > Add user**.
 2. Renseignez votre email et un mot de passe, cochez **Auto Confirm User**, puis créez l'utilisateur.
@@ -54,9 +50,16 @@ Aucune inscription publique n'existe : les comptes sont créés manuellement (pu
 
 4. Connectez-vous sur `/login` avec cet email/mot de passe : le tableau de bord affichera **Espace Administrateur**.
 
-## Gestion de l'équipe
+## Inscription des extras (code d'invitation)
 
-Depuis `/dashboard/team` (admin), le bouton **Ajouter un extra** envoie une invitation Supabase à l'adresse email saisie : la personne reçoit un lien pour définir son propre mot de passe (redirige vers `/update-password`), et sa ligne `profiles` est créée automatiquement avec le rôle `extra`. Un admin peut ensuite modifier ses informations ou désactiver son compte (le champ `actif` passe à `false` — la personne ne peut alors plus se connecter, mais son historique de créneaux est conservé).
+Depuis `/dashboard/team`, le bouton **Générer un code** crée un code du type `PLDX-4K9X` (table `invite_codes`) et l'affiche avec un bouton **Copier** — à transmettre à l'extra par SMS, oral, WhatsApp, etc.
+
+L'extra se rend sur `/rejoindre`, saisit le code, puis renseigne prénom/nom/email/téléphone/mot de passe. Sécurité appliquée côté serveur :
+- le code est vérifié puis **consommé atomiquement** (fonction `claim_invite_code`) au moment de la création du compte, pour empêcher toute réutilisation même en cas de double soumission ;
+- le rôle `extra` est **toujours forcé** côté serveur, quel que soit le code utilisé — ce formulaire ne peut jamais créer de compte admin ;
+- si la création du compte échoue après consommation du code, celui-ci est automatiquement relâché (`release_invite_code`).
+
+Un admin peut ensuite modifier les informations d'un extra ou désactiver son compte depuis `/dashboard/team` (le champ `actif` passe à `false` — la personne ne peut alors plus se connecter, mais son historique de créneaux est conservé).
 
 ## Planning
 
@@ -69,37 +72,44 @@ npm install
 npm run dev
 ```
 
-Ouvrez [http://localhost:3000](http://localhost:3000) — vous serez redirigé vers `/login` si vous n'êtes pas connecté.
+Ouvrez [http://localhost:3000](http://localhost:3000) : page d'accueil publique avec les liens **Se connecter** / **Créer mon compte extra**.
 
 ## Structure du projet
 
 ```
 src/
   app/
-    login/                    page de connexion
+    page.tsx                   accueil publique (Se connecter / Créer mon compte)
+    login/                     page de connexion (admin + extra)
     login/mot-de-passe-oublie/  demande de réinitialisation
-    update-password/          définition du nouveau mot de passe
-    auth/confirm/              route d'échange du lien email Supabase
-    dashboard/                 tableau de bord (protégé, différent admin/extra)
-    dashboard/team/            gestion de l'équipe (admin)
-    dashboard/planning/        gestion des créneaux (admin)
+    rejoindre/                 auto-inscription extra par code d'invitation
+    update-password/           définition du nouveau mot de passe
+    auth/confirm/               route d'échange du lien email Supabase
+    dashboard/                  tableau de bord (protégé, différent admin/extra)
+    dashboard/team/             gestion de l'équipe + codes d'invitation (admin)
+    dashboard/planning/         gestion des créneaux (admin)
   components/
-    ui/                       composants réutilisables (Button, Input, Select, Card, Badge)
-    auth/                     formulaires d'authentification
-    dashboard/                navigation du tableau de bord
-    team/                     liste et formulaires de gestion des extras
-    planning/                 vue planning admin + cartes de créneaux extra
+    ui/                        composants réutilisables (Button, Input, Select, Card, Badge, Logo)
+    auth/                      formulaires d'authentification
+    join/                      flux d'auto-inscription (code puis formulaire)
+    dashboard/                 navigation du tableau de bord
+    team/                      liste des extras + panneau de codes d'invitation
+    planning/                  vue planning admin + cartes de créneaux extra
   lib/
-    supabase/                 clients Supabase (browser, server, proxy, admin, get-profile)
-    types.ts                  types partagés (Profile, Shift, ...)
-    email.ts                  envoi d'emails via Resend
-  proxy.ts                    protection des routes (ex-middleware, renommé en Next.js 16)
+    supabase/                  clients Supabase (browser, server, proxy, get-profile, require-admin)
+    types.ts                   types partagés (Profile, Shift, InviteCode, ...)
+    email.ts                   envoi d'emails via Resend
+  proxy.ts                     protection des routes (ex-middleware, renommé en Next.js 16)
 supabase/
-  migrations/                 migrations SQL (profiles + RLS, shifts + RLS)
+  migrations/                  migrations SQL (profiles, shifts, invite_codes + RLS)
 ```
+
+## Identité visuelle
+
+Palette « nature sobre » définie dans [`src/app/globals.css`](src/app/globals.css) via des variables CSS (`--accent` vert forêt, `--sand` beige naturel, fond blanc cassé, texte anthracite, statuts vert/orange/rouge discrets). Typographie : Manrope. Pour ajuster une teinte, modifier les variables dans `:root` — tous les composants (`Button`, `Badge`, `Card`, etc.) en héritent automatiquement.
 
 ## Déploiement sur Vercel
 
 1. Importez le dépôt dans Vercel.
-2. Renseignez les mêmes variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`) dans **Project Settings > Environment Variables**.
+2. Renseignez les mêmes variables d'environnement (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`) dans **Project Settings > Environment Variables**.
 3. Ajoutez l'URL de production Vercel dans les **Redirect URLs** du projet Supabase (voir étape 6 ci-dessus).

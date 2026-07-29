@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/supabase/get-profile";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { Logo } from "@/components/ui/Logo";
 
 export default async function DashboardLayout({
   children,
@@ -21,9 +22,7 @@ export default async function DashboardLayout({
       <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold text-foreground">
-              Plandex
-            </span>
+            <Logo />
             <DashboardNav isAdmin={isAdmin} />
           </div>
           <LogoutButton />

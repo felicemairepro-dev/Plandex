@@ -32,3 +32,12 @@ export interface Shift {
 export interface ShiftWithExtra extends Shift {
   extra: Pick<Profile, "id" | "full_name" | "email"> | null;
 }
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  utilise: boolean;
+  cree_par: string;
+  cree_le: string;
+  expire_le: string | null;
+}

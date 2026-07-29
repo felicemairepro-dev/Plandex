@@ -2,7 +2,8 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
-import type { Profile } from "@/lib/types";
+import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
+import type { InviteCode, Profile } from "@/lib/types";
 
 export default async function TeamPage() {
   const { profile } = await getProfile();
@@ -21,12 +22,20 @@ export default async function TeamPage() {
   }
 
   const supabase = await createClient();
-  const { data: extras } = await supabase
-    .from("profiles")
-    .select("id, full_name, email, phone, role, actif")
-    .eq("role", "extra")
-    .order("full_name")
-    .returns<Profile[]>();
+
+  const [{ data: extras }, { data: codes }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, phone, role, actif")
+      .eq("role", "extra")
+      .order("full_name")
+      .returns<Profile[]>(),
+    supabase
+      .from("invite_codes")
+      .select("id, code, utilise, cree_par, cree_le, expire_le")
+      .order("cree_le", { ascending: false })
+      .returns<InviteCode[]>(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +46,7 @@ export default async function TeamPage() {
         </p>
       </div>
 
+      <InviteCodesPanel codes={codes ?? []} />
       <TeamList extras={extras ?? []} />
     </div>
   );
