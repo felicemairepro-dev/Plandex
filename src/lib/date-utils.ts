@@ -42,6 +42,41 @@ export function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1);
 }
 
+const APP_TIMEZONE = "Europe/Paris";
+
+// Convertit une date + heure "murale" (ex: 11:45 vu par un utilisateur en
+// France) en horodatage UTC exact. Nécessaire pour toute écriture serveur
+// dans une colonne timestamptz : le serveur (Netlify/Node) peut tourner
+// dans un fuseau différent (souvent UTC), donc `new Date(\`${date}T${time}\`)`
+// interpréterait à tort l'heure saisie comme étant déjà dans le fuseau du
+// serveur, décalant le résultat de plusieurs heures.
+export function parisWallTimeToISOString(dateStr: string, timeStr: string) {
+  const asIfUTC = new Date(`${dateStr}T${timeStr}:00.000Z`);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(asIfUTC);
+
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") map[part.type] = part.value;
+  }
+  // "24" apparaît parfois à la place de "00" avec hour12: false selon l'environnement.
+  const hour = map.hour === "24" ? "00" : map.hour;
+
+  const parisInstantReadAsUTC = new Date(
+    `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}.000Z`
+  );
+  const offsetMs = asIfUTC.getTime() - parisInstantReadAsUTC.getTime();
+  return new Date(asIfUTC.getTime() + offsetMs).toISOString();
+}
+
 // Liste des dates (ISO, incluses) entre deux dates, plafonnée à `maxDays`
 // pour éviter la création accidentelle de centaines de créneaux.
 export function getDateRange(

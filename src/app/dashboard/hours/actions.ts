@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
+import { parisWallTimeToISOString } from "@/lib/date-utils";
 import type { ActionResult } from "@/lib/types";
 
 export async function correctTimeEntry(
@@ -24,8 +25,8 @@ export async function correctTimeEntry(
   const { error } = await supabase
     .from("time_entries")
     .update({
-      heure_arrivee: arrivee ? new Date(`${date}T${arrivee}:00`).toISOString() : null,
-      heure_depart: depart ? new Date(`${date}T${depart}:00`).toISOString() : null,
+      heure_arrivee: arrivee ? parisWallTimeToISOString(date, arrivee) : null,
+      heure_depart: depart ? parisWallTimeToISOString(date, depart) : null,
       corrige_par_admin: true,
     })
     .eq("id", id);

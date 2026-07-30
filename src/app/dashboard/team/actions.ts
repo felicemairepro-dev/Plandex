@@ -21,7 +21,8 @@ export async function markMonthPaid(
   });
 
   if (error) {
-    return { error: "Impossible d'enregistrer ce paiement." };
+    console.error("markMonthPaid failed:", error);
+    return { error: `Impossible d'enregistrer ce paiement (${error.message}).` };
   }
 
   revalidatePath("/dashboard/team");
