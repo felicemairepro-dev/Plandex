@@ -16,6 +16,7 @@ import {
   toISODate,
 } from "@/lib/date-utils";
 import {
+  LATE_THRESHOLD_MINUTES,
   formatLocalTime,
   getDurationLabel,
   getLateMinutes,
@@ -28,7 +29,6 @@ import {
 import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
 const PAGE_SIZE = 15;
-const LATE_THRESHOLD_MINUTES = 15;
 
 type PeriodType = "semaine" | "mois";
 

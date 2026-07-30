@@ -31,12 +31,14 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-6">
-            <Logo />
-            <DashboardNav isAdmin={isAdmin} />
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+            <Logo className="shrink-0" />
+            <div className="min-w-0 overflow-x-auto">
+              <DashboardNav isAdmin={isAdmin} />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <NotificationBell notifications={notifications ?? []} />
             <LogoutButton />
           </div>

@@ -41,3 +41,31 @@ export function getMonthEnd(date: Date) {
 export function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1);
 }
+
+// Liste des dates (ISO, incluses) entre deux dates, plafonnée à `maxDays`
+// pour éviter la création accidentelle de centaines de créneaux.
+export function getDateRange(
+  startISO: string,
+  endISO: string,
+  maxDays = 31
+): string[] {
+  if (!startISO || !endISO) return [];
+  const start = new Date(`${startISO}T00:00:00`);
+  const end = new Date(`${endISO}T00:00:00`);
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end < start
+  ) {
+    return [];
+  }
+  const dates: string[] = [];
+  let cursor = start;
+  let i = 0;
+  while (cursor <= end && i < maxDays) {
+    dates.push(toISODate(cursor));
+    cursor = addDays(cursor, 1);
+    i++;
+  }
+  return dates;
+}

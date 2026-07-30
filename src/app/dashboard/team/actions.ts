@@ -67,6 +67,19 @@ export async function updateExtra(
   return { success: true };
 }
 
+export async function deleteInviteCode(id: string) {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("invite_codes").delete().eq("id", id);
+
+  if (error) {
+    throw new Error("Impossible de supprimer ce code.");
+  }
+
+  revalidatePath("/dashboard/team");
+}
+
 export async function toggleExtraActive(id: string, actif: boolean) {
   await requireAdmin();
 

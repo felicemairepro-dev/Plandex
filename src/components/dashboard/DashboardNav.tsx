@@ -19,7 +19,7 @@ export function DashboardNav({ isAdmin }: { isAdmin: boolean }) {
   const links = isAdmin ? [...ADMIN_LINKS, ...COMMON_LINKS] : COMMON_LINKS;
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav className="flex items-center gap-1 whitespace-nowrap">
       {links.map((link) => {
         const active =
           link.href === "/dashboard"

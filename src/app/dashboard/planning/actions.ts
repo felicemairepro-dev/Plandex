@@ -4,7 +4,21 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import { sendShiftAssignedEmail } from "@/lib/email";
+import { getDateRange } from "@/lib/date-utils";
 import type { ActionResult, ShiftStatus } from "@/lib/types";
+
+const MAX_RANGE_DAYS = 31;
+
+interface NewShiftRow {
+  date: string;
+  heure_debut: string;
+  heure_fin: string;
+  lieu: string;
+  poste: string;
+  extra_id: string;
+  statut: ShiftStatus;
+  cree_par: string;
+}
 
 function readShiftFields(formData: FormData) {
   return {
@@ -35,11 +49,135 @@ function validateShift(fields: ReturnType<typeof readShiftFields>) {
   return null;
 }
 
+function validateTimes(heureDebut: string, heureFin: string) {
+  if (!heureDebut || !heureFin) {
+    return "Les horaires sont obligatoires pour chaque jour.";
+  }
+  if (heureFin <= heureDebut) {
+    return "L'heure de fin doit être après l'heure de début.";
+  }
+  return null;
+}
+
+async function notifyShiftsAssigned(
+  extraId: string,
+  shifts: Pick<
+    NewShiftRow,
+    "date" | "heure_debut" | "heure_fin" | "lieu" | "poste"
+  >[]
+) {
+  const supabase = await createClient();
+  const { data: extra } = await supabase
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", extraId)
+    .single<{ email: string | null; full_name: string | null }>();
+
+  if (extra?.email) {
+    for (const shift of shifts) {
+      await sendShiftAssignedEmail({
+        to: extra.email,
+        extraFirstName: extra.full_name?.split(" ")[0] || "",
+        shift,
+      });
+    }
+  }
+
+  const message =
+    shifts.length === 1
+      ? `Nouveau créneau assigné le ${new Date(`${shifts[0].date}T00:00:00`).toLocaleDateString("fr-FR")} (${shifts[0].poste})`
+      : `${shifts.length} nouveaux créneaux assignés du ${new Date(`${shifts[0].date}T00:00:00`).toLocaleDateString("fr-FR")} au ${new Date(`${shifts[shifts.length - 1].date}T00:00:00`).toLocaleDateString("fr-FR")} (${shifts[0].poste})`;
+
+  await supabase.from("notifications").insert({
+    user_id: extraId,
+    message,
+  });
+}
+
+async function createShiftRange(
+  userId: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const dateDebut = String(formData.get("dateDebut") || "");
+  const dateFin = String(formData.get("dateFin") || "");
+  const sameHours = formData.get("sameHours") === "true";
+  const lieu = String(formData.get("lieu") || "").trim();
+  const poste = String(formData.get("poste") || "").trim();
+  const extraId = String(formData.get("extra_id") || "");
+  const statut = String(formData.get("statut") || "confirme") as ShiftStatus;
+
+  if (!dateDebut || !dateFin || !lieu || !poste || !extraId) {
+    return { error: "Tous les champs sont obligatoires." };
+  }
+
+  const dates = getDateRange(dateDebut, dateFin, MAX_RANGE_DAYS);
+  if (dates.length === 0) {
+    return {
+      error:
+        "La plage de dates est invalide (la date de fin doit être après la date de début).",
+    };
+  }
+
+  let sharedHeureDebut = "";
+  let sharedHeureFin = "";
+  if (sameHours) {
+    sharedHeureDebut = String(formData.get("heure_debut") || "");
+    sharedHeureFin = String(formData.get("heure_fin") || "");
+    const timeError = validateTimes(sharedHeureDebut, sharedHeureFin);
+    if (timeError) return { error: timeError };
+  }
+
+  const rows: NewShiftRow[] = [];
+  for (const date of dates) {
+    const heureDebut = sameHours
+      ? sharedHeureDebut
+      : String(formData.get(`heure_debut_${date}`) || "");
+    const heureFin = sameHours
+      ? sharedHeureFin
+      : String(formData.get(`heure_fin_${date}`) || "");
+
+    const timeError = validateTimes(heureDebut, heureFin);
+    if (timeError) return { error: `${timeError} (${date})` };
+
+    rows.push({
+      date,
+      heure_debut: heureDebut,
+      heure_fin: heureFin,
+      lieu,
+      poste,
+      extra_id: extraId,
+      statut,
+      cree_par: userId,
+    });
+  }
+
+  const supabase = await createClient();
+  const { data: shifts, error } = await supabase
+    .from("shifts")
+    .insert(rows)
+    .select("id, date, heure_debut, heure_fin, lieu, poste");
+
+  if (error || !shifts || shifts.length === 0) {
+    return { error: "Impossible de créer ces créneaux." };
+  }
+
+  await notifyShiftsAssigned(extraId, shifts);
+
+  revalidatePath("/dashboard/planning");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function createShift(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
   const { user } = await requireAdmin();
+
+  const mode = String(formData.get("mode") || "single");
+  if (mode === "range") {
+    return createShiftRange(user.id, formData);
+  }
 
   const fields = readShiftFields(formData);
   const validationError = validateShift(fields);
@@ -58,24 +196,7 @@ export async function createShift(
     return { error: "Impossible de créer ce créneau." };
   }
 
-  const { data: extra } = await supabase
-    .from("profiles")
-    .select("email, full_name")
-    .eq("id", fields.extra_id)
-    .single<{ email: string | null; full_name: string | null }>();
-
-  if (extra?.email) {
-    await sendShiftAssignedEmail({
-      to: extra.email,
-      extraFirstName: extra.full_name?.split(" ")[0] || "",
-      shift,
-    });
-  }
-
-  await supabase.from("notifications").insert({
-    user_id: fields.extra_id,
-    message: `Nouveau créneau assigné le ${new Date(`${fields.date}T00:00:00`).toLocaleDateString("fr-FR")} (${fields.poste})`,
-  });
+  await notifyShiftsAssigned(fields.extra_id, [shift]);
 
   revalidatePath("/dashboard/planning");
   revalidatePath("/dashboard");

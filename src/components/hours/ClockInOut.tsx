@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { clockIn, clockOut } from "@/app/dashboard/actions";
+import {
+  LATE_THRESHOLD_MINUTES,
+  computeLateMinutes,
+} from "@/lib/hours-utils";
 import type { Shift, TimeEntry } from "@/lib/types";
 
 function formatTime(iso: string) {
@@ -25,6 +29,11 @@ export function ClockInOut({
   const [current, setCurrent] = useState(entry);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const lateMinutes = current?.heure_arrivee
+    ? computeLateMinutes(shift.heure_debut, current.heure_arrivee)
+    : null;
+  const isLate = lateMinutes !== null && lateMinutes > LATE_THRESHOLD_MINUTES;
 
   function handleClockIn() {
     setError(null);
@@ -80,6 +89,11 @@ export function ClockInOut({
           <p className="text-xs text-muted">
             Prévu {formatScheduled(shift.heure_debut)} · Pointé{" "}
             {formatTime(current.heure_arrivee)}
+            {isLate && (
+              <span className="ml-1 font-medium text-warning">
+                (retard de {lateMinutes} min)
+              </span>
+            )}
           </p>
           <button
             onClick={handleClockOut}
@@ -104,6 +118,11 @@ export function ClockInOut({
           <p className="text-xs text-success/80">
             Prévu {formatScheduled(shift.heure_debut)}–
             {formatScheduled(shift.heure_fin)}
+            {isLate && (
+              <span className="ml-1 font-medium text-warning">
+                (retard de {lateMinutes} min à l&apos;arrivée)
+              </span>
+            )}
           </p>
         </div>
       )}

@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { generateInviteCode } from "@/app/dashboard/team/actions";
+import {
+  deleteInviteCode,
+  generateInviteCode,
+} from "@/app/dashboard/team/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -22,6 +25,8 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
   const [justGenerated, setJustGenerated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   function handleGenerate() {
     setError(null);
@@ -41,6 +46,26 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
     if (!justGenerated) return;
     await navigator.clipboard.writeText(justGenerated);
     setCopied(true);
+  }
+
+  function handleDelete(id: string) {
+    if (confirmingId !== id) {
+      setConfirmingId(id);
+      return;
+    }
+    setError(null);
+    setDeletingId(id);
+    startTransition(async () => {
+      try {
+        await deleteInviteCode(id);
+        setConfirmingId(null);
+        router.refresh();
+      } catch {
+        setError("Impossible de supprimer ce code.");
+      } finally {
+        setDeletingId(null);
+      }
+    });
   }
 
   return (
@@ -94,6 +119,23 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
                 <Badge variant={c.utilise ? "neutral" : "warning"}>
                   {c.utilise ? "Utilisé" : "En attente"}
                 </Badge>
+                <Button
+                  variant="secondary"
+                  loading={deletingId === c.id}
+                  onClick={() => handleDelete(c.id)}
+                  onBlur={() =>
+                    setConfirmingId((current) =>
+                      current === c.id ? null : current
+                    )
+                  }
+                  className={
+                    confirmingId === c.id
+                      ? "!border-danger !text-danger"
+                      : "!text-muted"
+                  }
+                >
+                  {confirmingId === c.id ? "Confirmer ?" : "Supprimer"}
+                </Button>
               </div>
             </div>
           ))}
