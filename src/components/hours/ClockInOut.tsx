@@ -19,6 +19,8 @@ function formatScheduled(time: string) {
   return time.slice(0, 5);
 }
 
+type ConfirmingAction = "arrivee" | "depart" | null;
+
 export function ClockInOut({
   shift,
   entry,
@@ -29,6 +31,8 @@ export function ClockInOut({
   const [current, setCurrent] = useState(entry);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirmingAction, setConfirmingAction] =
+    useState<ConfirmingAction>(null);
 
   const lateMinutes = current?.heure_arrivee
     ? computeLateMinutes(shift.heure_debut, current.heure_arrivee)
@@ -44,6 +48,7 @@ export function ClockInOut({
         return;
       }
       setCurrent(result.entry);
+      setConfirmingAction(null);
     });
   }
 
@@ -56,6 +61,7 @@ export function ClockInOut({
         return;
       }
       setCurrent(result.entry);
+      setConfirmingAction(null);
     });
   }
 
@@ -67,15 +73,38 @@ export function ClockInOut({
         </p>
       )}
 
-      {!current?.heure_arrivee && (
-        <button
-          onClick={handleClockIn}
-          disabled={pending}
-          className="w-full rounded-xl bg-accent px-4 py-4 text-base font-semibold text-accent-foreground shadow-sm transition-all duration-200 hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? "Enregistrement…" : "Pointer l'arrivée"}
-        </button>
-      )}
+      {!current?.heure_arrivee &&
+        (confirmingAction === "arrivee" ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium text-foreground">
+              Confirmer le pointage de votre arrivée maintenant ?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmingAction(null)}
+                disabled={pending}
+                className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-background disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleClockIn}
+                disabled={pending}
+                className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground shadow-sm transition-all duration-200 hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pending ? "Enregistrement…" : "Oui, pointer l'arrivée"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmingAction("arrivee")}
+            disabled={pending}
+            className="w-full rounded-xl bg-accent px-4 py-4 text-base font-semibold text-accent-foreground shadow-sm transition-all duration-200 hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Pointer l&apos;arrivée
+          </button>
+        ))}
 
       {current?.heure_arrivee && !current?.heure_depart && (
         <>
@@ -95,13 +124,38 @@ export function ClockInOut({
               </span>
             )}
           </p>
-          <button
-            onClick={handleClockOut}
-            disabled={pending}
-            className="w-full rounded-xl bg-foreground px-4 py-4 text-base font-semibold text-background shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pending ? "Enregistrement…" : "Pointer le départ"}
-          </button>
+
+          {confirmingAction === "depart" ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-foreground">
+                Confirmer le pointage de votre départ maintenant ?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmingAction(null)}
+                  disabled={pending}
+                  className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-background disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleClockOut}
+                  disabled={pending}
+                  className="flex-1 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background shadow-sm transition-all duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {pending ? "Enregistrement…" : "Oui, pointer le départ"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmingAction("depart")}
+              disabled={pending}
+              className="w-full rounded-xl bg-foreground px-4 py-4 text-base font-semibold text-background shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Pointer le départ
+            </button>
+          )}
         </>
       )}
 

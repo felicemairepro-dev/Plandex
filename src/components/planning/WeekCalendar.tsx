@@ -13,18 +13,47 @@ import {
   timeToMinutes,
   toISODate,
 } from "@/lib/date-utils";
-import type { Profile, ShiftStatus, ShiftWithExtra } from "@/lib/types";
+import type { Profile, ShiftWithExtra, TimeEntry } from "@/lib/types";
 
 const HOUR_HEIGHT = 56;
 const DEFAULT_RANGE: [number, number] = [7, 21];
 const MONTH_GRID_WEEKS = 6;
 const MAX_CHIPS_PER_DAY = 3;
 
-const STATUS_BLOCK_STYLES: Record<ShiftStatus, string> = {
-  confirme: "border-success bg-success-bg text-success",
-  propose: "border-warning bg-warning-bg text-warning",
-  annule: "border-danger bg-danger-bg text-danger line-through opacity-80",
-};
+const CANCELLED_STYLE =
+  "border-danger bg-danger-bg text-danger line-through opacity-80";
+
+const EXTRA_COLOR_PALETTE = [
+  "#2d5a3d",
+  "#1d4ed8",
+  "#b45309",
+  "#7c3aed",
+  "#be185d",
+  "#0891b2",
+  "#4d7c0f",
+  "#9333ea",
+  "#c2410c",
+  "#0f766e",
+];
+
+function getExtraColor(extraId: string) {
+  let hash = 0;
+  for (let i = 0; i < extraId.length; i++) {
+    hash = (hash * 31 + extraId.charCodeAt(i)) >>> 0;
+  }
+  return EXTRA_COLOR_PALETTE[hash % EXTRA_COLOR_PALETTE.length];
+}
+
+function getShiftBlockStyle(shift: ShiftWithExtra): React.CSSProperties {
+  if (shift.statut === "annule") return {};
+  const color = getExtraColor(shift.extra_id);
+  return {
+    borderColor: color,
+    backgroundColor: `${color}1a`,
+    color,
+    borderStyle: shift.statut === "propose" ? "dashed" : "solid",
+  };
+}
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -55,10 +84,12 @@ type ViewMode = "semaine" | "mois";
 export function WeekCalendar({
   shifts,
   extras = [],
+  entriesByShiftId = {},
   readOnly = false,
 }: {
   shifts: ShiftWithExtra[];
   extras?: Profile[];
+  entriesByShiftId?: Record<string, TimeEntry>;
   readOnly?: boolean;
 }) {
   const [view, setView] = useState<ViewMode>("semaine");
@@ -251,14 +282,26 @@ export function WeekCalendar({
                     );
 
                     const Block = readOnly ? "div" : "button";
+                    const isCancelled = shift.statut === "annule";
+                    const hasArrived = Boolean(
+                      entriesByShiftId[shift.id]?.heure_arrivee
+                    );
 
                     return (
                       <Block
                         key={shift.id}
                         onClick={readOnly ? undefined : () => setEditingShift(shift)}
-                        className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow ${readOnly ? "" : "hover:shadow-md"} ${STATUS_BLOCK_STYLES[shift.statut]}`}
-                        style={{ top, height }}
+                        className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow ${readOnly ? "" : "hover:shadow-md"} ${isCancelled ? CANCELLED_STYLE : ""}`}
+                        style={{ top, height, ...getShiftBlockStyle(shift) }}
                       >
+                        {!readOnly && !isCancelled && hasArrived && (
+                          <span
+                            className="absolute right-1 top-1 text-success"
+                            title="Arrivée pointée"
+                          >
+                            ✓
+                          </span>
+                        )}
                         <p className="font-semibold">
                           {shift.heure_debut.slice(0, 5)}–
                           {shift.heure_fin.slice(0, 5)}
@@ -317,14 +360,22 @@ export function WeekCalendar({
                   <div className="mt-1 flex flex-col gap-1">
                     {visibleShifts.map((shift) => {
                       const Chip = readOnly ? "div" : "button";
+                      const isCancelled = shift.statut === "annule";
+                      const hasArrived = Boolean(
+                        entriesByShiftId[shift.id]?.heure_arrivee
+                      );
                       return (
                         <Chip
                           key={shift.id}
                           onClick={
                             readOnly ? undefined : () => setEditingShift(shift)
                           }
-                          className={`w-full truncate rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight ${STATUS_BLOCK_STYLES[shift.statut]}`}
+                          className={`relative w-full truncate rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight ${isCancelled ? CANCELLED_STYLE : ""}`}
+                          style={getShiftBlockStyle(shift)}
                         >
+                          {!readOnly && !isCancelled && hasArrived && (
+                            <span className="mr-0.5 text-success">✓</span>
+                          )}
                           {shift.heure_debut.slice(0, 5)}{" "}
                           {readOnly
                             ? shift.poste
@@ -356,6 +407,7 @@ export function WeekCalendar({
           <ShiftForm
             extras={extras}
             shift={editingShift}
+            entry={entriesByShiftId[editingShift.id] ?? null}
             onDone={() => setEditingShift(null)}
           />
         </Modal>

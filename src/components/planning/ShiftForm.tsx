@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { SHIFT_STATUS_LABELS } from "@/lib/shift-status";
 import { getDateRange } from "@/lib/date-utils";
-import type { ActionResult, Profile, ShiftWithExtra } from "@/lib/types";
+import type { ActionResult, Profile, ShiftWithExtra, TimeEntry } from "@/lib/types";
 
 const initialState: ActionResult = {};
 const MAX_RANGE_DAYS = 31;
@@ -27,13 +27,22 @@ function formatDayLabel(iso: string) {
   });
 }
 
+function formatEntryTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function ShiftForm({
   extras,
   shift,
+  entry,
   onDone,
 }: {
   extras: Profile[];
   shift?: ShiftWithExtra;
+  entry?: TimeEntry | null;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -130,6 +139,25 @@ export function ShiftForm({
       <h2 className="text-lg font-semibold text-foreground">
         {shift ? "Modifier le créneau" : "Créer un créneau"}
       </h2>
+
+      {shift && (
+        <div
+          className={`mt-3 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm ${
+            entry?.heure_arrivee
+              ? "bg-success-bg text-success"
+              : "bg-background text-muted"
+          }`}
+        >
+          <span>{entry?.heure_arrivee ? "✓" : "—"}</span>
+          <span>
+            {entry?.heure_arrivee && entry?.heure_depart
+              ? `Pointé : arrivée ${formatEntryTime(entry.heure_arrivee)} – départ ${formatEntryTime(entry.heure_depart)}`
+              : entry?.heure_arrivee
+                ? `Arrivée pointée à ${formatEntryTime(entry.heure_arrivee)} · départ non pointé`
+                : "Pas encore pointé"}
+          </span>
+        </div>
+      )}
 
       <form action={formAction} className="mt-5 flex flex-col gap-4">
         {shift && <input type="hidden" name="id" value={shift.id} />}

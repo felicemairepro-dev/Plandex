@@ -2,7 +2,7 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { WeekCalendar } from "@/components/planning/WeekCalendar";
-import type { Profile, ShiftWithExtra } from "@/lib/types";
+import type { Profile, ShiftWithExtra, TimeEntry } from "@/lib/types";
 
 export default async function PlanningPage() {
   const { profile } = await getProfile();
@@ -22,23 +22,33 @@ export default async function PlanningPage() {
 
   const supabase = await createClient();
 
-  const [{ data: shifts }, { data: extras }] = await Promise.all([
-    supabase
-      .from("shifts")
-      .select(
-        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
-      )
-      .order("date")
-      .order("heure_debut")
-      .returns<ShiftWithExtra[]>(),
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, role, actif, taux_horaire")
-      .eq("role", "extra")
-      .eq("actif", true)
-      .order("full_name")
-      .returns<Profile[]>(),
-  ]);
+  const [{ data: shifts }, { data: extras }, { data: timeEntries }] =
+    await Promise.all([
+      supabase
+        .from("shifts")
+        .select(
+          "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
+        )
+        .order("date")
+        .order("heure_debut")
+        .returns<ShiftWithExtra[]>(),
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, role, actif, taux_horaire")
+        .eq("role", "extra")
+        .eq("actif", true)
+        .order("full_name")
+        .returns<Profile[]>(),
+      supabase
+        .from("time_entries")
+        .select("id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le")
+        .returns<TimeEntry[]>(),
+    ]);
+
+  const entriesByShiftId: Record<string, TimeEntry> = {};
+  for (const entry of timeEntries ?? []) {
+    entriesByShiftId[entry.shift_id] = entry;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +59,11 @@ export default async function PlanningPage() {
         </p>
       </div>
 
-      <WeekCalendar shifts={shifts ?? []} extras={extras ?? []} />
+      <WeekCalendar
+        shifts={shifts ?? []}
+        extras={extras ?? []}
+        entriesByShiftId={entriesByShiftId}
+      />
     </div>
   );
 }
