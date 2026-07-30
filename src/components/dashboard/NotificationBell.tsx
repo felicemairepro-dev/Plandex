@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
 import {
   markAllNotificationsRead,
   markNotificationRead,
@@ -26,11 +27,25 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(notifications);
   const [, startTransition] = useTransition();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const pathname = usePathname();
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    if (open) setOpen(false);
+  }
 
   const unreadCount = items.filter((n) => !n.lu).length;
 
   function handleOpenToggle() {
     setOpen((v) => !v);
+  }
+
+  function handleContainerBlur(event: React.FocusEvent<HTMLDivElement>) {
+    const next = event.relatedTarget as Node | null;
+    if (next && containerRef.current?.contains(next)) return;
+    setOpen(false);
   }
 
   function handleItemClick(notification: Notification) {
@@ -51,7 +66,7 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef} onBlur={handleContainerBlur}>
       <button
         onClick={handleOpenToggle}
         aria-label="Notifications"
@@ -78,13 +93,7 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-border bg-surface p-2 shadow-md">
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-border bg-surface p-2 shadow-md">
             <div className="flex items-center justify-between px-2 py-1.5">
               <span className="text-sm font-semibold text-foreground">
                 Notifications
@@ -122,8 +131,7 @@ export function NotificationBell({
                 ))
               )}
             </div>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

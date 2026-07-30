@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
@@ -33,7 +34,9 @@ export default async function DashboardLayout({
       <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-4 sm:gap-6">
-            <Logo className="shrink-0" />
+            <Link href="/dashboard" className="shrink-0">
+              <Logo />
+            </Link>
             <div className="min-w-0 overflow-x-auto">
               <DashboardNav isAdmin={isAdmin} />
             </div>

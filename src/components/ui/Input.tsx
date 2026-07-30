@@ -4,12 +4,13 @@ import { clsx } from "@/lib/utils";
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
   /** Optional element (e.g. a button) absolutely positioned inside the input, on the right. */
   rightSlot?: React.ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, rightSlot, ...props }, ref) => {
+  ({ className, label, error, hint, id, rightSlot, ...props }, ref) => {
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
@@ -36,7 +37,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error ? (
+          <p className="text-sm text-danger">{error}</p>
+        ) : (
+          hint && <p className="text-xs text-muted">{hint}</p>
+        )}
       </div>
     );
   }
