@@ -22,11 +22,18 @@ function formatDate(date: string) {
 export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [localCodes, setLocalCodes] = useState(codes);
   const [justGenerated, setJustGenerated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const [prevCodes, setPrevCodes] = useState(codes);
+  if (prevCodes !== codes) {
+    setPrevCodes(codes);
+    setLocalCodes(codes);
+  }
 
   function handleGenerate() {
     setError(null);
@@ -59,6 +66,7 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
       try {
         await deleteInviteCode(id);
         setConfirmingId(null);
+        setLocalCodes((current) => current.filter((c) => c.id !== id));
         router.refresh();
       } catch {
         setError("Impossible de supprimer ce code.");
@@ -102,9 +110,9 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
         </div>
       )}
 
-      {codes.length > 0 && (
+      {localCodes.length > 0 && (
         <div className="mt-6">
-          {codes.map((c) => (
+          {localCodes.map((c) => (
             <div
               key={c.id}
               className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 last:border-none"

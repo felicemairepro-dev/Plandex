@@ -8,9 +8,9 @@ export const SHIFT_STATUS_LABELS: Record<ShiftStatus, string> = {
 
 export const SHIFT_STATUS_BADGE: Record<
   ShiftStatus,
-  "success" | "warning" | "neutral"
+  "success" | "warning" | "neutral" | "danger"
 > = {
   confirme: "success",
   propose: "warning",
-  annule: "neutral",
+  annule: "danger",
 };

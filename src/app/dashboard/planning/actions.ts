@@ -245,7 +245,7 @@ export async function updateShift(
   return { success: true };
 }
 
-export async function cancelShift(id: string) {
+export async function cancelShift(id: string): Promise<ActionResult> {
   await requireAdmin();
 
   const supabase = await createClient();
@@ -255,9 +255,25 @@ export async function cancelShift(id: string) {
     .eq("id", id);
 
   if (error) {
-    throw new Error("Impossible d'annuler ce créneau.");
+    return { error: "Impossible d'annuler ce créneau." };
   }
 
   revalidatePath("/dashboard/planning");
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function deleteShift(id: string): Promise<ActionResult> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("shifts").delete().eq("id", id);
+
+  if (error) {
+    return { error: "Impossible de supprimer ce créneau." };
+  }
+
+  revalidatePath("/dashboard/planning");
+  revalidatePath("/dashboard");
+  return { success: true };
 }

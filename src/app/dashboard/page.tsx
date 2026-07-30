@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/supabase/get-profile";
-import { Card } from "@/components/ui/Card";
+import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ExtraDashboardTabs } from "@/components/dashboard/ExtraDashboardTabs";
+import { isShiftActiveNow, shiftDurationHours } from "@/lib/kpi";
+import { formatHoursLabel } from "@/lib/monthly-recap";
 import type { Shift, ShiftWithExtra, TimeEntry, TimeEntryWithShift } from "@/lib/types";
 
 export default async function DashboardPage() {
@@ -15,15 +17,86 @@ export default async function DashboardPage() {
   const firstName = profile.full_name?.split(" ")[0] || user.email;
 
   if (profile.role === "admin") {
+    const supabase = await createClient();
+    const [{ data: extras }, { data: shifts }, { data: entries }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, taux_horaire")
+          .eq("role", "extra")
+          .returns<{ id: string; taux_horaire: number | null }[]>(),
+        supabase
+          .from("shifts")
+          .select("date, heure_debut, heure_fin, extra_id, statut")
+          .returns<
+            Pick<Shift, "date" | "heure_debut" | "heure_fin" | "extra_id" | "statut">[]
+          >(),
+        supabase
+          .from("time_entries")
+          .select("heure_arrivee, heure_depart")
+          .returns<Pick<TimeEntry, "heure_arrivee" | "heure_depart">[]>(),
+      ]);
+
+    const tauxHoraireByExtraId = new Map(
+      (extras ?? []).map((e) => [e.id, e.taux_horaire])
+    );
+
+    const now = new Date();
+    const activeShiftsNow = (shifts ?? []).filter((s) =>
+      isShiftActiveNow(s, now)
+    ).length;
+
+    const totalWorkedMinutes = (entries ?? []).reduce((sum, entry) => {
+      if (!entry.heure_arrivee || !entry.heure_depart) return sum;
+      const diff =
+        new Date(entry.heure_depart).getTime() -
+        new Date(entry.heure_arrivee).getTime();
+      return diff > 0 ? sum + Math.round(diff / 60000) : sum;
+    }, 0);
+
+    const totalCost = (shifts ?? [])
+      .filter((s) => s.statut !== "annule")
+      .reduce((sum, s) => {
+        const taux = tauxHoraireByExtraId.get(s.extra_id);
+        if (taux == null) return sum;
+        return sum + shiftDurationHours(s.heure_debut, s.heure_fin) * taux;
+      }, 0);
+
     return (
-      <Card>
-        <h1 className="text-2xl font-semibold text-foreground">
-          Bienvenue, {firstName}
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Retrouvez votre équipe et le planning dans le menu ci-dessus.
-        </p>
-      </Card>
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Bienvenue, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Voici un aperçu de votre activité.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Équipiers"
+            value={String((extras ?? []).length)}
+            href="/dashboard/team"
+          />
+          <KpiCard
+            label="En poste en ce moment"
+            value={String(activeShiftsNow)}
+            href="/dashboard/planning"
+          />
+          <KpiCard
+            label="Heures effectuées (total)"
+            value={formatHoursLabel(totalWorkedMinutes)}
+            href="/dashboard/hours"
+          />
+          <KpiCard
+            label="Coût prévisionnel total"
+            value={`${totalCost.toFixed(2)} €`}
+            href="/dashboard/hours"
+            hint="Basé sur les créneaux planifiés et les taux horaires"
+          />
+        </div>
+      </div>
     );
   }
 

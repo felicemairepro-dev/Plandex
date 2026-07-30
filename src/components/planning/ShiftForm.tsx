@@ -1,7 +1,13 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { createShift, updateShift } from "@/app/dashboard/planning/actions";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  cancelShift,
+  createShift,
+  deleteShift,
+  updateShift,
+} from "@/app/dashboard/planning/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -30,6 +36,7 @@ export function ShiftForm({
   shift?: ShiftWithExtra;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     shift ? updateShift : createShift,
     initialState
@@ -39,6 +46,42 @@ export function ShiftForm({
   if (prevState !== state) {
     setPrevState(state);
     if (state.success) onDone();
+  }
+
+  const [dangerPending, startDangerTransition] = useTransition();
+  const [dangerError, setDangerError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  function handleCancelShift() {
+    if (!shift) return;
+    setDangerError(null);
+    startDangerTransition(async () => {
+      const result = await cancelShift(shift.id);
+      if (result.error) {
+        setDangerError(result.error);
+        return;
+      }
+      router.refresh();
+      onDone();
+    });
+  }
+
+  function handleDeleteShift() {
+    if (!shift) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setDangerError(null);
+    startDangerTransition(async () => {
+      const result = await deleteShift(shift.id);
+      if (result.error) {
+        setDangerError(result.error);
+        return;
+      }
+      router.refresh();
+      onDone();
+    });
   }
 
   const [mode, setMode] = useState<"single" | "range">("single");
@@ -297,6 +340,43 @@ export function ShiftForm({
           </Button>
         </div>
       </form>
+
+      {shift && (
+        <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+          {dangerError && (
+            <p className="rounded-xl bg-danger-bg px-3.5 py-2.5 text-sm text-danger">
+              {dangerError}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-3">
+            {shift.statut !== "annule" && (
+              <Button
+                type="button"
+                variant="secondary"
+                loading={dangerPending}
+                onClick={handleCancelShift}
+                className="!text-warning"
+              >
+                Annuler le créneau
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              loading={dangerPending}
+              onClick={handleDeleteShift}
+              onBlur={() => setConfirmingDelete(false)}
+              className={
+                confirmingDelete ? "!border-danger !text-danger" : "!text-muted"
+              }
+            >
+              {confirmingDelete
+                ? "Confirmer la suppression ?"
+                : "Supprimer le créneau"}
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

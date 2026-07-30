@@ -18,10 +18,12 @@ export function ExtraShiftCard({
   shift: Shift;
   children?: React.ReactNode;
 }) {
+  const isCancelled = shift.statut === "annule";
+
   return (
-    <Card className="p-5">
+    <Card className={isCancelled ? "p-5 opacity-70" : "p-5"}>
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className={isCancelled ? "line-through" : undefined}>
           <p className="text-sm font-semibold capitalize text-foreground">
             {formatDate(shift.date)}
           </p>
@@ -38,11 +40,13 @@ export function ExtraShiftCard({
           )}
         </div>
       </div>
-      <div className="mt-4 flex flex-col gap-1 text-sm text-foreground">
+      <div
+        className={`mt-4 flex flex-col gap-1 text-sm text-foreground ${isCancelled ? "line-through" : ""}`}
+      >
         <p>{shift.poste}</p>
         <p className="text-muted">{shift.lieu}</p>
       </div>
-      {children}
+      {!isCancelled && children}
     </Card>
   );
 }

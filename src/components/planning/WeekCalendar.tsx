@@ -19,7 +19,7 @@ const DEFAULT_RANGE: [number, number] = [7, 21];
 const STATUS_BLOCK_STYLES: Record<ShiftStatus, string> = {
   confirme: "border-success bg-success-bg text-success",
   propose: "border-warning bg-warning-bg text-warning",
-  annule: "border-border bg-sand/20 text-muted line-through",
+  annule: "border-danger bg-danger-bg text-danger line-through opacity-80",
 };
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
