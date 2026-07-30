@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useReducer, useState, useTransition } from "react";
 import { clockIn, clockOut } from "@/app/dashboard/actions";
 import {
   LATE_THRESHOLD_MINUTES,
   computeLateMinutes,
 } from "@/lib/hours-utils";
 import type { Shift, TimeEntry } from "@/lib/types";
+
+const EARLY_CLOCK_IN_MINUTES = 10;
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("fr-FR", {
@@ -17,6 +19,26 @@ function formatTime(iso: string) {
 
 function formatScheduled(time: string) {
   return time.slice(0, 5);
+}
+
+function getClockInAvailability(heureDebut: string) {
+  const now = new Date();
+  const [hours, minutes] = heureDebut.split(":").map(Number);
+  const scheduled = new Date(now);
+  scheduled.setHours(hours, minutes, 0, 0);
+  const allowedFrom = new Date(scheduled.getTime() - EARLY_CLOCK_IN_MINUTES * 60000);
+
+  if (now >= allowedFrom) {
+    return { canClockIn: true as const };
+  }
+  return {
+    canClockIn: false as const,
+    allowedFromLabel: allowedFrom.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    minutesRemaining: Math.ceil((allowedFrom.getTime() - now.getTime()) / 60000),
+  };
 }
 
 type ConfirmingAction = "arrivee" | "depart" | null;
@@ -33,6 +55,17 @@ export function ClockInOut({
   const [pending, startTransition] = useTransition();
   const [confirmingAction, setConfirmingAction] =
     useState<ConfirmingAction>(null);
+
+  // Force un nouveau rendu périodiquement pour que le bouton de pointage
+  // d'arrivée se débloque tout seul une fois la fenêtre des 10 min atteinte,
+  // sans que l'extra ait besoin de recharger la page.
+  const [, forceTick] = useReducer((c: number) => c + 1, 0);
+  useEffect(() => {
+    const id = setInterval(() => forceTick(), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const clockInAvailability = getClockInAvailability(shift.heure_debut);
 
   const lateMinutes = current?.heure_arrivee
     ? computeLateMinutes(shift.heure_debut, current.heure_arrivee)
@@ -73,7 +106,18 @@ export function ClockInOut({
         </p>
       )}
 
+      {!current?.heure_arrivee && !clockInAvailability.canClockIn && (
+        <p className="rounded-xl bg-background px-3.5 py-2.5 text-sm text-muted">
+          Vous pourrez pointer votre arrivée à partir de{" "}
+          <strong className="text-foreground">
+            {clockInAvailability.allowedFromLabel}
+          </strong>{" "}
+          (dans {clockInAvailability.minutesRemaining} min).
+        </p>
+      )}
+
       {!current?.heure_arrivee &&
+        clockInAvailability.canClockIn &&
         (confirmingAction === "arrivee" ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium text-foreground">

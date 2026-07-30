@@ -44,14 +44,70 @@ function getExtraColor(extraId: string) {
   return EXTRA_COLOR_PALETTE[hash % EXTRA_COLOR_PALETTE.length];
 }
 
-function getShiftBlockStyle(shift: ShiftWithExtra): React.CSSProperties {
-  if (shift.statut === "annule") return {};
+const PROGRESS_COLOR_ENCOURS = "#1d4ed8";
+
+function getShiftProgressPhase(
+  shift: ShiftWithExtra,
+  now: Date
+): "avenir" | "encours" | "termine" {
+  const todayISO = toISODate(now);
+  if (shift.date < todayISO) return "termine";
+  if (shift.date > todayISO) return "avenir";
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const start = timeToMinutes(shift.heure_debut);
+  const end = timeToMinutes(shift.heure_fin);
+  if (nowMinutes < start) return "avenir";
+  if (nowMinutes < end) return "encours";
+  return "termine";
+}
+
+/**
+ * Couleur d'un créneau dans le calendrier : par extra pour l'admin (pour
+ * distinguer qui travaille où), par avancement (à venir / en cours /
+ * terminé) pour l'extra sur son propre planning en lecture seule.
+ */
+function getBlockAppearance(
+  shift: ShiftWithExtra,
+  readOnly: boolean,
+  now: Date
+): { className: string; style: React.CSSProperties } {
+  if (shift.statut === "annule") {
+    return { className: CANCELLED_STYLE, style: {} };
+  }
+
+  if (readOnly) {
+    const phase = getShiftProgressPhase(shift, now);
+    if (phase === "avenir") {
+      return {
+        className: "border-warning bg-warning-bg text-warning",
+        style: {},
+      };
+    }
+    if (phase === "termine") {
+      return {
+        className: "border-success bg-success-bg text-success",
+        style: {},
+      };
+    }
+    return {
+      className: "text-foreground",
+      style: {
+        borderColor: PROGRESS_COLOR_ENCOURS,
+        backgroundColor: `${PROGRESS_COLOR_ENCOURS}1a`,
+        color: PROGRESS_COLOR_ENCOURS,
+      },
+    };
+  }
+
   const color = getExtraColor(shift.extra_id);
   return {
-    borderColor: color,
-    backgroundColor: `${color}1a`,
-    color,
-    borderStyle: shift.statut === "propose" ? "dashed" : "solid",
+    className: "text-foreground",
+    style: {
+      borderColor: color,
+      backgroundColor: `${color}1a`,
+      color,
+      borderStyle: shift.statut === "propose" ? "dashed" : "solid",
+    },
   };
 }
 
@@ -286,13 +342,14 @@ export function WeekCalendar({
                     const hasArrived = Boolean(
                       entriesByShiftId[shift.id]?.heure_arrivee
                     );
+                    const appearance = getBlockAppearance(shift, readOnly, today);
 
                     return (
                       <Block
                         key={shift.id}
                         onClick={readOnly ? undefined : () => setEditingShift(shift)}
-                        className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow ${readOnly ? "" : "hover:shadow-md"} ${isCancelled ? CANCELLED_STYLE : ""}`}
-                        style={{ top, height, ...getShiftBlockStyle(shift) }}
+                        className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow ${readOnly ? "" : "hover:shadow-md"} ${appearance.className}`}
+                        style={{ top, height, ...appearance.style }}
                       >
                         {!readOnly && !isCancelled && hasArrived && (
                           <span
@@ -364,14 +421,15 @@ export function WeekCalendar({
                       const hasArrived = Boolean(
                         entriesByShiftId[shift.id]?.heure_arrivee
                       );
+                      const appearance = getBlockAppearance(shift, readOnly, today);
                       return (
                         <Chip
                           key={shift.id}
                           onClick={
                             readOnly ? undefined : () => setEditingShift(shift)
                           }
-                          className={`relative w-full truncate rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight ${isCancelled ? CANCELLED_STYLE : ""}`}
-                          style={getShiftBlockStyle(shift)}
+                          className={`relative w-full truncate rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight ${appearance.className}`}
+                          style={appearance.style}
                         >
                           {!readOnly && !isCancelled && hasArrived && (
                             <span className="mr-0.5 text-success">✓</span>
