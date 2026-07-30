@@ -280,22 +280,26 @@ export function WeekCalendar({
         </div>
       </div>
 
-      {!readOnly && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-          {(Object.keys(PROGRESS_PHASE_LABELS) as ShiftPhase[]).map((phase) => (
-            <span key={phase} className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: PROGRESS_PHASE_DOT_COLORS[phase] }}
-              />
-              {PROGRESS_PHASE_LABELS[phase]}
-            </span>
-          ))}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+        {(Object.keys(PROGRESS_PHASE_LABELS) as ShiftPhase[]).map((phase) => (
+          <span key={phase} className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ backgroundColor: PROGRESS_PHASE_DOT_COLORS[phase] }}
+            />
+            {PROGRESS_PHASE_LABELS[phase]}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5 text-danger">
+          <span className="inline-block h-2 w-2 rounded-full bg-danger" />
+          Annulé
+        </span>
+        {!readOnly && (
           <span className="flex items-center gap-1.5 text-success">
             ✓ Arrivée pointée
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {view === "semaine" ? (
         <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">

@@ -1,5 +1,6 @@
 import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
+import { withPaymentColumnFallback } from "@/lib/supabase/time-entries";
 import { Card } from "@/components/ui/Card";
 import { HoursTable } from "@/components/hours/HoursTable";
 import type { Profile, TimeEntryWithShift } from "@/lib/types";
@@ -23,13 +24,15 @@ export default async function HoursPage() {
   const supabase = await createClient();
 
   const [{ data: entries }, { data: extras }] = await Promise.all([
-    supabase
-      .from("time_entries")
-      .select(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, paye, paye_le, paye_par, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
-      )
-      .order("cree_le", { ascending: false })
-      .returns<TimeEntryWithShift[]>(),
+    withPaymentColumnFallback<TimeEntryWithShift>(
+      "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)",
+      (select) =>
+        supabase
+          .from("time_entries")
+          .select(select)
+          .order("cree_le", { ascending: false })
+          .returns<TimeEntryWithShift[]>()
+    ).then(({ data }) => ({ data })),
     supabase
       .from("profiles")
       .select("id, full_name, email, phone, role, actif, taux_horaire")

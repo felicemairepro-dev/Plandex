@@ -12,7 +12,11 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { RecapModal } from "@/components/hours/RecapModal";
 import { formatLocalTime, getDurationLabel } from "@/lib/hours-utils";
-import { computeEntryMinutes, estimateAmount } from "@/lib/monthly-recap";
+import {
+  computeEntryMinutes,
+  estimateAmount,
+  formatHoursLabel,
+} from "@/lib/monthly-recap";
 import type { ActionResult, Profile, TimeEntryWithShift } from "@/lib/types";
 
 const initialState: ActionResult = {};
@@ -51,6 +55,10 @@ export function ExtraRow({
   const joursTravailles = new Set(
     completedEntries.map((entry) => entry.shift?.date).filter(Boolean)
   ).size;
+  const totalWorkedMinutes = completedEntries.reduce(
+    (sum, entry) => sum + computeEntryMinutes(entry),
+    0
+  );
   const unpaidEntries = completedEntries.filter((entry) => !entry.paye);
   const unpaidMinutes = unpaidEntries.reduce(
     (sum, entry) => sum + computeEntryMinutes(entry),
@@ -152,7 +160,8 @@ export function ExtraRow({
           )}
           <p className="text-sm text-muted">
             {joursTravailles} jour{joursTravailles > 1 ? "s" : ""} travaillé
-            {joursTravailles > 1 ? "s" : ""}
+            {joursTravailles > 1 ? "s" : ""} ·{" "}
+            {formatHoursLabel(totalWorkedMinutes)} effectuées
           </p>
         </div>
 
@@ -186,44 +195,54 @@ export function ExtraRow({
         </div>
       </div>
 
-      <div
-        className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
-          unpaidEntries.length === 0 ? "bg-success-bg" : "bg-background"
-        }`}
-      >
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            {unpaidEntries.length === 0
-              ? "Aucune mission en attente de paiement"
-              : `${unpaidEntries.length} mission${unpaidEntries.length > 1 ? "s" : ""} non payée${unpaidEntries.length > 1 ? "s" : ""}`}
-          </p>
+      {completedEntries.length === 0 ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background px-4 py-3">
           <p className="text-sm text-muted">
-            {unpaidEntries.length === 0
-              ? "Payez au fil des missions, quand vous voulez."
-              : unpaidAmount != null
-                ? `${unpaidAmount.toFixed(2)} € restant à payer pour ${(unpaidMinutes / 60).toFixed(1)}h effectuées`
-                : "Taux horaire non renseigné"}
+            Aucune mission effectuée pour le moment — rien à payer pour
+            l&apos;instant.
           </p>
+          <Badge variant="neutral">Aucune mission</Badge>
         </div>
-        <div className="flex items-center gap-2">
-          {unpaidEntries.length === 0 ? (
-            <Badge variant="success">Tout est payé</Badge>
-          ) : (
-            <Badge variant="warning">En attente de paiement</Badge>
+      ) : (
+        <div
+          className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
+            unpaidEntries.length === 0 ? "bg-success-bg" : "bg-background"
+          }`}
+        >
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {unpaidEntries.length === 0
+                ? "Toutes les missions ont été payées"
+                : `${unpaidEntries.length} mission${unpaidEntries.length > 1 ? "s" : ""} non payée${unpaidEntries.length > 1 ? "s" : ""}`}
+            </p>
+            <p className="text-sm text-muted">
+              {unpaidEntries.length === 0
+                ? "Payez au fil des missions, quand vous voulez."
+                : unpaidAmount != null
+                  ? `${unpaidAmount.toFixed(2)} € restant à payer pour ${(unpaidMinutes / 60).toFixed(1)}h effectuées`
+                  : "Taux horaire non renseigné"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {unpaidEntries.length === 0 ? (
+              <Badge variant="success">Tout est payé</Badge>
+            ) : (
+              <Badge variant="warning">En attente de paiement</Badge>
+            )}
+            <Button
+              variant="secondary"
+              loading={paymentPending}
+              disabled={unpaidEntries.length === 0}
+              onClick={handleMarkPaid}
+            >
+              Marquer comme payé
+            </Button>
+          </div>
+          {paymentError && (
+            <p className="w-full text-sm text-danger">{paymentError}</p>
           )}
-          <Button
-            variant="secondary"
-            loading={paymentPending}
-            disabled={unpaidEntries.length === 0}
-            onClick={handleMarkPaid}
-          >
-            Marquer comme payé
-          </Button>
         </div>
-        {paymentError && (
-          <p className="w-full text-sm text-danger">{paymentError}</p>
-        )}
-      </div>
+      )}
 
       {showHistory && (
         <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">

@@ -5,6 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ExtraDashboardTabs } from "@/components/dashboard/ExtraDashboardTabs";
 import { isShiftActiveNow, shiftDurationHours } from "@/lib/kpi";
 import { formatHoursLabel } from "@/lib/monthly-recap";
+import { withPaymentColumnFallback } from "@/lib/supabase/time-entries";
 import type {
   Shift,
   ShiftWithExtra,
@@ -130,13 +131,15 @@ export default async function DashboardPage() {
       .order("date")
       .order("heure_debut")
       .returns<Shift[]>(),
-    supabase
-      .from("time_entries")
-      .select(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, paye, paye_le, paye_par, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
-      )
-      .eq("extra_id", user.id)
-      .returns<TimeEntryWithShift[]>(),
+    withPaymentColumnFallback<TimeEntryWithShift>(
+      "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)",
+      (select) =>
+        supabase
+          .from("time_entries")
+          .select(select)
+          .eq("extra_id", user.id)
+          .returns<TimeEntryWithShift[]>()
+    ).then(({ data }) => ({ data })),
   ]);
 
   const entriesByShiftId: Record<string, TimeEntry> = {};
