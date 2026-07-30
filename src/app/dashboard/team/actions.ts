@@ -5,6 +5,54 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
+export async function markMonthPaid(
+  extraId: string,
+  mois: string,
+  montant: number
+): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("payments").insert({
+    extra_id: extraId,
+    mois,
+    montant,
+    paye_par: user.id,
+  });
+
+  if (error) {
+    return { error: "Impossible d'enregistrer ce paiement." };
+  }
+
+  revalidatePath("/dashboard/team");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/hours");
+  return { success: true };
+}
+
+export async function unmarkMonthPaid(
+  extraId: string,
+  mois: string
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("payments")
+    .delete()
+    .eq("extra_id", extraId)
+    .eq("mois", mois);
+
+  if (error) {
+    return { error: "Impossible d'annuler ce paiement." };
+  }
+
+  revalidatePath("/dashboard/team");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/hours");
+  return { success: true };
+}
+
 interface GenerateCodeResult extends ActionResult {
   code?: InviteCode;
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import {
   addMonths,
   getMonthEnd,
@@ -15,15 +16,17 @@ import {
   estimateAmount,
   formatHoursLabel,
 } from "@/lib/monthly-recap";
-import type { Profile, TimeEntryWithShift } from "@/lib/types";
+import type { Payment, Profile, TimeEntryWithShift } from "@/lib/types";
 
 export function RecapView({
   extra,
   entries,
+  payments = [],
   onClose,
 }: {
   extra: Pick<Profile, "full_name" | "email" | "taux_horaire">;
   entries: TimeEntryWithShift[];
+  payments?: Payment[];
   onClose?: () => void;
 }) {
   const [referenceDate, setReferenceDate] = useState(() => new Date());
@@ -49,6 +52,7 @@ export function RecapView({
     month: "long",
     year: "numeric",
   });
+  const monthPayment = payments.find((p) => p.mois === startISO);
 
   return (
     <Card className="printable">
@@ -71,9 +75,16 @@ export function RecapView({
       </div>
 
       <div className="mt-4">
-        <h2 className="text-lg font-semibold text-foreground">
-          Récapitulatif — {extra.full_name || extra.email}
-        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            Récapitulatif — {extra.full_name || extra.email}
+          </h2>
+          {monthPayment ? (
+            <Badge variant="success">Payé</Badge>
+          ) : (
+            <Badge variant="warning">Non payé</Badge>
+          )}
+        </div>
         <p className="mt-1 text-sm capitalize text-muted">{monthLabel}</p>
         <p className="mt-1 text-xs text-muted">
           Ce document est une base indicative pour la facturation — ce

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
 import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
-import type { InviteCode, Profile, TimeEntryWithShift } from "@/lib/types";
+import type { InviteCode, Payment, Profile, TimeEntryWithShift } from "@/lib/types";
 
 export default async function TeamPage() {
   const { profile } = await getProfile();
@@ -23,7 +23,7 @@ export default async function TeamPage() {
 
   const supabase = await createClient();
 
-  const [{ data: extras }, { data: codes }, { data: timeEntries }] =
+  const [{ data: extras }, { data: codes }, { data: timeEntries }, { data: payments }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -43,6 +43,11 @@ export default async function TeamPage() {
         )
         .order("cree_le", { ascending: false })
         .returns<TimeEntryWithShift[]>(),
+      supabase
+        .from("payments")
+        .select("id, extra_id, mois, montant, paye_le, paye_par")
+        .order("mois", { ascending: false })
+        .returns<Payment[]>(),
     ]);
 
   const historyByExtraId = new Map<string, TimeEntryWithShift[]>();
@@ -50,6 +55,13 @@ export default async function TeamPage() {
     const list = historyByExtraId.get(entry.extra_id) ?? [];
     list.push(entry);
     historyByExtraId.set(entry.extra_id, list);
+  }
+
+  const paymentsByExtraId = new Map<string, Payment[]>();
+  for (const payment of payments ?? []) {
+    const list = paymentsByExtraId.get(payment.extra_id) ?? [];
+    list.push(payment);
+    paymentsByExtraId.set(payment.extra_id, list);
   }
 
   return (
@@ -65,6 +77,7 @@ export default async function TeamPage() {
       <TeamList
         extras={extras ?? []}
         historyByExtraId={Object.fromEntries(historyByExtraId)}
+        paymentsByExtraId={Object.fromEntries(paymentsByExtraId)}
       />
     </div>
   );

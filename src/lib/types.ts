@@ -62,6 +62,15 @@ export interface TimeEntryWithShift extends TimeEntry {
   extra: Pick<Profile, "id" | "full_name"> | null;
 }
 
+export interface Payment {
+  id: string;
+  extra_id: string;
+  mois: string;
+  montant: number;
+  paye_le: string;
+  paye_par: string;
+}
+
 export interface Notification {
   id: string;
   user_id: string;
