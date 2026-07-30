@@ -127,7 +127,7 @@ export default async function DashboardPage() {
       supabase
         .from("shifts")
         .select(
-          "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, remplacement_demande"
+          "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le"
         )
         .eq("extra_id", user.id)
         .order("date")

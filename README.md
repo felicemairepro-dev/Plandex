@@ -28,7 +28,7 @@ Application interne de gestion de planning pour les extras/indépendants. Accès
    - [`supabase/migrations/0003_invite_codes.sql`](supabase/migrations/0003_invite_codes.sql) — table `invite_codes` et les fonctions qui gèrent leur génération/validation/consommation (voir plus bas).
    - [`supabase/migrations/0004_time_entries.sql`](supabase/migrations/0004_time_entries.sql) — table `time_entries` (badgage) et les fonctions `clock_in`/`clock_out` (voir "Badgage" plus bas).
    - [`supabase/migrations/0005_taux_horaire.sql`](supabase/migrations/0005_taux_horaire.sql) — ajoute `taux_horaire` à `profiles`, modifiable uniquement par un admin (trigger dédié).
-   - [`supabase/migrations/0006_swaps_and_notifications.sql`](supabase/migrations/0006_swaps_and_notifications.sql) — ajoute `remplacement_demande` à `shifts`, la fonction `request_shift_replacement`, et la table `notifications` (voir "Échanges de créneaux" plus bas).
+   - [`supabase/migrations/0006_swaps_and_notifications.sql`](supabase/migrations/0006_swaps_and_notifications.sql) — ajoute la table `notifications` (voir "Notifications" plus bas). Ajoutait aussi `remplacement_demande` et `request_shift_replacement`, retirés depuis par [`0010_remove_replacement_requests.sql`](supabase/migrations/0010_remove_replacement_requests.sql).
    - [`supabase/migrations/0007_security_hardening.sql`](supabase/migrations/0007_security_hardening.sql) — corrige une faille : sans ce trigger, un extra pouvait modifier son propre `role`/`actif` via un appel direct à l'API REST (voir "Sécurité" plus bas). **Important si vous avez déployé avant cette migration.**
 
 5. Dans **Authentication > Email Templates**, vérifiez que le template "Reset Password" pointe bien vers `/auth/confirm` (comportement par défaut de Supabase, déjà géré par ce projet). Si la confirmation d'email est activée (**Authentication > Providers > Email > Confirm email**), le template "Confirm signup" doit pointer vers la même route.
@@ -101,11 +101,9 @@ En local, vous pouvez déclencher ce rappel manuellement sans passer par la fonc
 curl -H "Authorization: Bearer VOTRE_CRON_SECRET" http://localhost:3000/api/cron/reminders
 ```
 
-## Échanges de créneaux & notifications
+## Notifications
 
-Depuis un créneau **confirmé à venir** sur son tableau de bord, un extra peut cliquer sur **Demander un remplacement** : le créneau affiche alors un badge orange « Remplacement demandé » (visible admin et extra), et tous les admins reçoivent une notification interne (et peuvent être notifiés par email — voir ci-dessous) — **aucune validation automatique** entre extras, l'admin garde la main. Pour résoudre la demande, l'admin modifie simplement le créneau depuis `/dashboard/planning` (réassignation à un autre extra ou non) : la sauvegarde du formulaire efface automatiquement le badge et notifie l'extra à l'origine de la demande que sa demande a été traitée.
-
-La cloche de notifications dans le header (table `notifications`, RLS : chacun ne voit que les siennes) liste ces évènements — nouveau créneau assigné, remplacement demandé (admin), remplacement traité (extra) — avec un compteur nouveaux non lus ; cliquer une notification la marque comme lue.
+La cloche de notifications dans le header (table `notifications`, RLS : chacun ne voit que les siennes) liste les évènements internes — nouveau créneau assigné — avec un compteur nouveaux non lus ; cliquer une notification la marque comme lue.
 
 ## Statistiques
 
@@ -155,7 +153,7 @@ src/
     join/                      flux d'auto-inscription (code puis formulaire)
     dashboard/                 navigation, cloche de notifications, onglets du tableau de bord extra
     team/                      liste des extras + panneau de codes d'invitation
-    planning/                  calendrier semaine (admin, éditable ; extra, lecture seule), demande de remplacement
+    planning/                  calendrier semaine/mois (admin, éditable ; extra, lecture seule)
     hours/                     pointage extra (ClockInOut), tableau/correction admin, récapitulatifs (RecapView/RecapModal)
     stats/                     graphique et classement (StatsView)
     settings/                  formulaires profil/mot de passe

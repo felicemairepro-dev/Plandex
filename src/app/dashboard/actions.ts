@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionResult, Shift, TimeEntry } from "@/lib/types";
+import type { ActionResult, TimeEntry } from "@/lib/types";
 
 interface ClockResult extends ActionResult {
   entry?: TimeEntry;
@@ -41,29 +41,6 @@ export async function markAllNotificationsRead() {
     .eq("user_id", user.id)
     .eq("lu", false);
   revalidatePath("/dashboard");
-}
-
-interface RequestReplacementResult extends ActionResult {
-  shift?: Shift;
-}
-
-export async function requestReplacement(
-  shiftId: string
-): Promise<RequestReplacementResult> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .rpc("request_shift_replacement", { p_shift_id: shiftId })
-    .single<Shift>();
-
-  if (error || !data) {
-    return {
-      error:
-        "Impossible de demander un remplacement pour ce créneau.",
-    };
-  }
-
-  revalidatePath("/dashboard");
-  return { success: true, shift: data };
 }
 
 export async function clockOut(shiftId: string): Promise<ClockResult> {

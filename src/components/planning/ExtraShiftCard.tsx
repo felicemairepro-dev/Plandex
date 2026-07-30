@@ -35,9 +35,6 @@ export function ExtraShiftCard({
           <Badge variant={SHIFT_STATUS_BADGE[shift.statut]}>
             {SHIFT_STATUS_LABELS[shift.statut]}
           </Badge>
-          {shift.remplacement_demande && (
-            <Badge variant="warning">Remplacement demandé</Badge>
-          )}
         </div>
       </div>
       <div

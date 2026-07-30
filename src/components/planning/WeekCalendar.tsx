@@ -269,11 +269,6 @@ export function WeekCalendar({
                             : shift.extra?.full_name || shift.extra?.email}
                         </p>
                         <p className="truncate opacity-80">{shift.poste}</p>
-                        {shift.remplacement_demande && (
-                          <p className="mt-0.5 truncate rounded bg-warning px-1 py-0.5 text-[10px] font-semibold text-accent-foreground">
-                            Remplacement demandé
-                          </p>
-                        )}
                       </Block>
                     );
                   })}

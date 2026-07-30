@@ -28,7 +28,6 @@ export interface Shift {
   statut: ShiftStatus;
   cree_par: string;
   cree_le: string;
-  remplacement_demande: boolean;
 }
 
 export interface ShiftWithExtra extends Shift {
