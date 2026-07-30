@@ -30,11 +30,13 @@ function shiftEmailLayout({
   greeting,
   intro,
   shift,
+  tauxHoraire,
   outro,
 }: {
   greeting: string;
   intro: string;
   shift: ShiftEmailDetails;
+  tauxHoraire?: number | null;
   outro: string;
 }) {
   return `
@@ -62,6 +64,14 @@ function shiftEmailLayout({
             <td style="padding: 8px 0; color: #726f62; font-size: 14px;">Poste</td>
             <td style="padding: 8px 0; color: #2b2a25; font-size: 14px; font-weight: 600; text-align: right;">${shift.poste}</td>
           </tr>
+          ${
+            tauxHoraire != null
+              ? `<tr>
+            <td style="padding: 8px 0; color: #726f62; font-size: 14px;">Taux horaire</td>
+            <td style="padding: 8px 0; color: #2b2a25; font-size: 14px; font-weight: 600; text-align: right;">${tauxHoraire.toFixed(2)} € / h</td>
+          </tr>`
+              : ""
+          }
         </table>
         <p style="color: #726f62; font-size: 14px;">${outro}</p>
       </div>
@@ -72,10 +82,12 @@ function shiftEmailLayout({
 export async function sendShiftAssignedEmail({
   to,
   extraFirstName,
+  tauxHoraire,
   shift,
 }: {
   to: string;
   extraFirstName: string;
+  tauxHoraire?: number | null;
   shift: ShiftEmailDetails;
 }) {
   if (!resend) {
@@ -93,6 +105,7 @@ export async function sendShiftAssignedEmail({
       greeting: `Bonjour ${extraFirstName},`,
       intro: "Un nouveau créneau vous a été assigné :",
       shift,
+      tauxHoraire,
       outro: "Connectez-vous à votre tableau de bord pour plus de détails.",
     }),
   });

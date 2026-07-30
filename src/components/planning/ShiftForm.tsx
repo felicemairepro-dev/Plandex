@@ -88,12 +88,26 @@ export function ShiftForm({
   const [sameHours, setSameHours] = useState(true);
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [excludedDates, setExcludedDates] = useState<Set<string>>(new Set());
 
   const rangeDates = useMemo(
     () =>
       mode === "range" ? getDateRange(dateDebut, dateFin, MAX_RANGE_DAYS) : [],
     [mode, dateDebut, dateFin]
   );
+
+  const includedDatesCount = rangeDates.filter(
+    (iso) => !excludedDates.has(iso)
+  ).length;
+
+  function toggleDateIncluded(iso: string, included: boolean) {
+    setExcludedDates((current) => {
+      const next = new Set(current);
+      if (included) next.delete(iso);
+      else next.add(iso);
+      return next;
+    });
+  }
 
   const isRangeMode = mode === "range" && !shift;
 
@@ -241,30 +255,48 @@ export function ShiftForm({
             ) : (
               rangeDates.length > 0 && (
                 <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
-                  {rangeDates.map((iso) => (
-                    <div
-                      key={iso}
-                      className="grid grid-cols-3 items-center gap-3"
-                    >
-                      <span className="text-sm font-medium capitalize text-foreground">
-                        {formatDayLabel(iso)}
-                      </span>
-                      <Input
-                        id={`heure_debut_${iso}`}
-                        name={`heure_debut_${iso}`}
-                        type="time"
-                        aria-label={`Heure de début ${iso}`}
-                        required
-                      />
-                      <Input
-                        id={`heure_fin_${iso}`}
-                        name={`heure_fin_${iso}`}
-                        type="time"
-                        aria-label={`Heure de fin ${iso}`}
-                        required
-                      />
-                    </div>
-                  ))}
+                  <p className="text-xs text-muted">
+                    Décochez un jour pour ne pas y créer de créneau.
+                  </p>
+                  {rangeDates.map((iso) => {
+                    const included = !excludedDates.has(iso);
+                    return (
+                      <div
+                        key={iso}
+                        className={`grid grid-cols-[auto_1fr_1fr] items-center gap-3 ${
+                          included ? "" : "opacity-50"
+                        }`}
+                      >
+                        <label className="flex items-center gap-2 text-sm font-medium capitalize text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={included}
+                            onChange={(e) =>
+                              toggleDateIncluded(iso, e.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-border accent-accent"
+                          />
+                          {formatDayLabel(iso)}
+                        </label>
+                        <Input
+                          id={`heure_debut_${iso}`}
+                          name={`heure_debut_${iso}`}
+                          type="time"
+                          aria-label={`Heure de début ${iso}`}
+                          disabled={!included}
+                          required={included}
+                        />
+                        <Input
+                          id={`heure_fin_${iso}`}
+                          name={`heure_fin_${iso}`}
+                          type="time"
+                          aria-label={`Heure de fin ${iso}`}
+                          disabled={!included}
+                          required={included}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )
             )}
@@ -334,8 +366,9 @@ export function ShiftForm({
           <Button type="submit" loading={pending}>
             {shift
               ? "Enregistrer"
-              : isRangeMode && rangeDates.length > 1
-                ? `Créer ${rangeDates.length} créneaux`
+              : isRangeMode &&
+                  (sameHours ? rangeDates.length : includedDatesCount) > 1
+                ? `Créer ${sameHours ? rangeDates.length : includedDatesCount} créneaux`
                 : "Créer le créneau"}
           </Button>
         </div>

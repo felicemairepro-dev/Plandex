@@ -69,15 +69,20 @@ async function notifyShiftsAssigned(
   const supabase = await createClient();
   const { data: extra } = await supabase
     .from("profiles")
-    .select("email, full_name")
+    .select("email, full_name, taux_horaire")
     .eq("id", extraId)
-    .single<{ email: string | null; full_name: string | null }>();
+    .single<{
+      email: string | null;
+      full_name: string | null;
+      taux_horaire: number | null;
+    }>();
 
   if (extra?.email) {
     for (const shift of shifts) {
       await sendShiftAssignedEmail({
         to: extra.email,
         extraFirstName: extra.full_name?.split(" ")[0] || "",
+        tauxHoraire: extra.taux_horaire,
         shift,
       });
     }
@@ -136,6 +141,12 @@ async function createShiftRange(
       ? sharedHeureFin
       : String(formData.get(`heure_fin_${date}`) || "");
 
+    // En mode "horaires par jour", un jour décoché n'a pas d'heures
+    // renseignées : on le saute simplement au lieu de lever une erreur.
+    if (!sameHours && !heureDebut && !heureFin) {
+      continue;
+    }
+
     const timeError = validateTimes(heureDebut, heureFin);
     if (timeError) return { error: `${timeError} (${date})` };
 
@@ -149,6 +160,10 @@ async function createShiftRange(
       statut,
       cree_par: userId,
     });
+  }
+
+  if (rows.length === 0) {
+    return { error: "Sélectionnez au moins un jour." };
   }
 
   const supabase = await createClient();
