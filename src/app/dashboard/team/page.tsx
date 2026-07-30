@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
 import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
-import type { InviteCode, Payment, Profile, TimeEntryWithShift } from "@/lib/types";
+import type { InviteCode, Profile, TimeEntryWithShift } from "@/lib/types";
 
 export default async function TeamPage() {
   const { profile } = await getProfile();
@@ -23,7 +23,7 @@ export default async function TeamPage() {
 
   const supabase = await createClient();
 
-  const [{ data: extras }, { data: codes }, { data: timeEntries }, { data: payments }] =
+  const [{ data: extras }, { data: codes }, { data: timeEntries, error: timeEntriesError }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -39,29 +39,21 @@ export default async function TeamPage() {
       supabase
         .from("time_entries")
         .select(
-          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, paye, paye_le, paye_par, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
         )
         .order("cree_le", { ascending: false })
         .returns<TimeEntryWithShift[]>(),
-      supabase
-        .from("payments")
-        .select("id, extra_id, mois, montant, paye_le, paye_par")
-        .order("mois", { ascending: false })
-        .returns<Payment[]>(),
     ]);
+
+  if (timeEntriesError) {
+    console.error("TeamPage time_entries query failed:", timeEntriesError);
+  }
 
   const historyByExtraId = new Map<string, TimeEntryWithShift[]>();
   for (const entry of timeEntries ?? []) {
     const list = historyByExtraId.get(entry.extra_id) ?? [];
     list.push(entry);
     historyByExtraId.set(entry.extra_id, list);
-  }
-
-  const paymentsByExtraId = new Map<string, Payment[]>();
-  for (const payment of payments ?? []) {
-    const list = paymentsByExtraId.get(payment.extra_id) ?? [];
-    list.push(payment);
-    paymentsByExtraId.set(payment.extra_id, list);
   }
 
   return (
@@ -77,7 +69,6 @@ export default async function TeamPage() {
       <TeamList
         extras={extras ?? []}
         historyByExtraId={Object.fromEntries(historyByExtraId)}
-        paymentsByExtraId={Object.fromEntries(paymentsByExtraId)}
       />
     </div>
   );

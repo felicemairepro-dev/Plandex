@@ -51,6 +51,9 @@ export interface TimeEntry {
   heure_depart: string | null;
   corrige_par_admin: boolean;
   cree_le: string;
+  paye: boolean;
+  paye_le: string | null;
+  paye_par: string | null;
 }
 
 export interface TimeEntryWithShift extends TimeEntry {
@@ -59,15 +62,6 @@ export interface TimeEntryWithShift extends TimeEntry {
     "date" | "heure_debut" | "heure_fin" | "poste" | "lieu"
   > | null;
   extra: Pick<Profile, "id" | "full_name"> | null;
-}
-
-export interface Payment {
-  id: string;
-  extra_id: string;
-  mois: string;
-  montant: number;
-  paye_le: string;
-  paye_par: string;
 }
 
 export interface Notification {

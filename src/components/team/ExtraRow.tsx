@@ -3,35 +3,26 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  markMonthPaid,
+  markEntriesPaid,
   toggleExtraActive,
-  unmarkMonthPaid,
   updateExtra,
 } from "@/app/dashboard/team/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { RecapModal } from "@/components/hours/RecapModal";
-import { getMonthEnd, getMonthStart, toISODate } from "@/lib/date-utils";
 import { formatLocalTime, getDurationLabel } from "@/lib/hours-utils";
 import { computeEntryMinutes, estimateAmount } from "@/lib/monthly-recap";
-import type {
-  ActionResult,
-  Payment,
-  Profile,
-  TimeEntryWithShift,
-} from "@/lib/types";
+import type { ActionResult, Profile, TimeEntryWithShift } from "@/lib/types";
 
 const initialState: ActionResult = {};
 
 export function ExtraRow({
   extra,
   history,
-  payments,
 }: {
   extra: Profile;
   history: TimeEntryWithShift[];
-  payments: Payment[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -54,35 +45,23 @@ export function ExtraRow({
   const [firstName, ...rest] = (extra.full_name ?? "").split(" ");
   const lastName = rest.join(" ");
 
-  const now = new Date();
-  const currentMonthISO = toISODate(getMonthStart(now));
-  const monthStartISO = currentMonthISO;
-  const monthEndISO = toISODate(getMonthEnd(now));
-  const monthMinutes = history
-    .filter(
-      (entry) =>
-        entry.shift &&
-        entry.shift.date >= monthStartISO &&
-        entry.shift.date <= monthEndISO
-    )
-    .reduce((sum, entry) => sum + computeEntryMinutes(entry), 0);
-  const monthAmountDue = estimateAmount(monthMinutes, extra.taux_horaire);
-  const currentMonthPayment = payments.find((p) => p.mois === currentMonthISO);
-  const monthLabel = now.toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric",
-  });
+  const completedEntries = history.filter(
+    (entry) => entry.heure_arrivee && entry.heure_depart
+  );
+  const joursTravailles = new Set(
+    completedEntries.map((entry) => entry.shift?.date).filter(Boolean)
+  ).size;
+  const unpaidEntries = completedEntries.filter((entry) => !entry.paye);
+  const unpaidMinutes = unpaidEntries.reduce(
+    (sum, entry) => sum + computeEntryMinutes(entry),
+    0
+  );
+  const unpaidAmount = estimateAmount(unpaidMinutes, extra.taux_horaire);
 
-  function handleTogglePayment() {
+  function handleMarkPaid() {
     setPaymentError(null);
     startPaymentTransition(async () => {
-      const result = currentMonthPayment
-        ? await unmarkMonthPaid(extra.id, currentMonthISO)
-        : await markMonthPaid(
-            extra.id,
-            currentMonthISO,
-            monthAmountDue ?? 0
-          );
+      const result = await markEntriesPaid(unpaidEntries.map((e) => e.id));
       if (result.error) {
         setPaymentError(result.error);
         return;
@@ -171,6 +150,10 @@ export function ExtraRow({
           {extra.taux_horaire != null && (
             <p className="text-sm text-muted">{extra.taux_horaire} €/h</p>
           )}
+          <p className="text-sm text-muted">
+            {joursTravailles} jour{joursTravailles > 1 ? "s" : ""} travaillé
+            {joursTravailles > 1 ? "s" : ""}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -205,40 +188,36 @@ export function ExtraRow({
 
       <div
         className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
-          currentMonthPayment
-            ? "bg-success-bg"
-            : "bg-background"
+          unpaidEntries.length === 0 ? "bg-success-bg" : "bg-background"
         }`}
       >
         <div>
-          <p className="text-sm font-medium capitalize text-foreground">
-            {monthLabel}
+          <p className="text-sm font-medium text-foreground">
+            {unpaidEntries.length === 0
+              ? "Aucune mission en attente de paiement"
+              : `${unpaidEntries.length} mission${unpaidEntries.length > 1 ? "s" : ""} non payée${unpaidEntries.length > 1 ? "s" : ""}`}
           </p>
           <p className="text-sm text-muted">
-            {monthAmountDue != null
-              ? `${monthAmountDue.toFixed(2)} € pour ${(monthMinutes / 60).toFixed(1)}h effectuées`
-              : "Taux horaire non renseigné"}
+            {unpaidEntries.length === 0
+              ? "Payez au fil des missions, quand vous voulez."
+              : unpaidAmount != null
+                ? `${unpaidAmount.toFixed(2)} € restant à payer pour ${(unpaidMinutes / 60).toFixed(1)}h effectuées`
+                : "Taux horaire non renseigné"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {currentMonthPayment ? (
-            <Badge variant="success">
-              Payé le{" "}
-              {new Date(currentMonthPayment.paye_le).toLocaleDateString(
-                "fr-FR",
-                { day: "numeric", month: "short" }
-              )}
-            </Badge>
+          {unpaidEntries.length === 0 ? (
+            <Badge variant="success">Tout est payé</Badge>
           ) : (
             <Badge variant="warning">En attente de paiement</Badge>
           )}
           <Button
             variant="secondary"
             loading={paymentPending}
-            onClick={handleTogglePayment}
-            className={currentMonthPayment ? "!text-muted" : undefined}
+            disabled={unpaidEntries.length === 0}
+            onClick={handleMarkPaid}
           >
-            {currentMonthPayment ? "Annuler le paiement" : "Marquer comme payé"}
+            Marquer comme payé
           </Button>
         </div>
         {paymentError && (
@@ -276,6 +255,9 @@ export function ExtraRow({
                         corrigé
                       </span>
                     )}
+                    {entry.paye && (
+                      <span className="ml-2 text-xs text-success">payé</span>
+                    )}
                   </span>
                 </li>
               ))}
@@ -288,7 +270,6 @@ export function ExtraRow({
         <RecapModal
           extra={extra}
           entries={history}
-          payments={payments}
           onClose={() => setShowRecap(false)}
         />
       )}

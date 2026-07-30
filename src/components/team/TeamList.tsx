@@ -1,16 +1,14 @@
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExtraRow } from "@/components/team/ExtraRow";
-import type { Payment, Profile, TimeEntryWithShift } from "@/lib/types";
+import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
 export function TeamList({
   extras,
   historyByExtraId,
-  paymentsByExtraId,
 }: {
   extras: Profile[];
   historyByExtraId: Record<string, TimeEntryWithShift[]>;
-  paymentsByExtraId: Record<string, Payment[]>;
 }) {
   return (
     <Card>
@@ -25,7 +23,6 @@ export function TeamList({
             key={extra.id}
             extra={extra}
             history={historyByExtraId[extra.id] ?? []}
-            payments={paymentsByExtraId[extra.id] ?? []}
           />
         ))
       )}

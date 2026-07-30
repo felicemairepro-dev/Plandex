@@ -5,9 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ExtraDashboardTabs } from "@/components/dashboard/ExtraDashboardTabs";
 import { isShiftActiveNow, shiftDurationHours } from "@/lib/kpi";
 import { formatHoursLabel } from "@/lib/monthly-recap";
-import { getMonthStart, toISODate } from "@/lib/date-utils";
 import type {
-  Payment,
   Shift,
   ShiftWithExtra,
   TimeEntry,
@@ -122,30 +120,24 @@ export default async function DashboardPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: shifts }, { data: timeEntries }, { data: payments }] =
-    await Promise.all([
-      supabase
-        .from("shifts")
-        .select(
-          "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le"
-        )
-        .eq("extra_id", user.id)
-        .order("date")
-        .order("heure_debut")
-        .returns<Shift[]>(),
-      supabase
-        .from("time_entries")
-        .select(
-          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
-        )
-        .eq("extra_id", user.id)
-        .returns<TimeEntryWithShift[]>(),
-      supabase
-        .from("payments")
-        .select("id, extra_id, mois, montant, paye_le, paye_par")
-        .eq("extra_id", user.id)
-        .returns<Payment[]>(),
-    ]);
+  const [{ data: shifts }, { data: timeEntries }] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select(
+        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le"
+      )
+      .eq("extra_id", user.id)
+      .order("date")
+      .order("heure_debut")
+      .returns<Shift[]>(),
+    supabase
+      .from("time_entries")
+      .select(
+        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, paye, paye_le, paye_par, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+      )
+      .eq("extra_id", user.id)
+      .returns<TimeEntryWithShift[]>(),
+  ]);
 
   const entriesByShiftId: Record<string, TimeEntry> = {};
   for (const entry of timeEntries ?? []) {
@@ -183,17 +175,19 @@ export default async function DashboardPage() {
       0
     );
 
-  const paidMonths = new Set((payments ?? []).map((p) => p.mois));
+  const completedEntries = (timeEntries ?? []).filter(
+    (entry) => entry.heure_arrivee && entry.heure_depart
+  );
+  const joursTravailles = new Set(
+    completedEntries.map((entry) => entry.shift?.date).filter(Boolean)
+  ).size;
+
   let unpaidWorkedMinutes = 0;
-  for (const entry of timeEntries ?? []) {
-    if (!entry.heure_arrivee || !entry.heure_depart || !entry.shift) continue;
-    const entryMonthISO = toISODate(
-      getMonthStart(new Date(`${entry.shift.date}T00:00:00`))
-    );
-    if (paidMonths.has(entryMonthISO)) continue;
+  for (const entry of completedEntries) {
+    if (entry.paye) continue;
     const diff =
-      new Date(entry.heure_depart).getTime() -
-      new Date(entry.heure_arrivee).getTime();
+      new Date(entry.heure_depart as string).getTime() -
+      new Date(entry.heure_arrivee as string).getTime();
     if (diff > 0) unpaidWorkedMinutes += Math.round(diff / 60000);
   }
 
@@ -201,11 +195,6 @@ export default async function DashboardPage() {
     unpaidWorkedMinutes > 0 && profile.taux_horaire != null
       ? (unpaidWorkedMinutes / 60) * profile.taux_horaire
       : null;
-
-  const currentMonthISO = toISODate(getMonthStart(new Date()));
-  const currentMonthPayment = (payments ?? []).find(
-    (p) => p.mois === currentMonthISO
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -229,6 +218,11 @@ export default async function DashboardPage() {
           hint="Créneaux restant à faire"
         />
         <KpiCard
+          label="Jours travaillés"
+          value={String(joursTravailles)}
+          href="/dashboard/hours"
+        />
+        <KpiCard
           label="Argent à percevoir"
           value={
             unpaidWorkedMinutes === 0
@@ -238,12 +232,7 @@ export default async function DashboardPage() {
                 : "Taux non renseigné"
           }
           href="/dashboard/hours"
-          hint="Basé sur les heures déjà effectuées, non encore payées"
-        />
-        <KpiCard
-          label={`Paiement de ${new Date().toLocaleDateString("fr-FR", { month: "long" })}`}
-          value={currentMonthPayment ? "Payé" : "En attente"}
-          href="/dashboard/hours"
+          hint="Basé sur les missions déjà effectuées, non encore payées"
         />
       </div>
 
@@ -254,7 +243,6 @@ export default async function DashboardPage() {
         entriesByShiftId={entriesByShiftId}
         calendarShifts={calendarShifts}
         recapEntries={timeEntries ?? []}
-        payments={payments ?? []}
         today={today}
       />
     </div>

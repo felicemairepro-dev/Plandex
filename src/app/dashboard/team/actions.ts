@@ -5,24 +5,33 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
-export async function markMonthPaid(
-  extraId: string,
-  mois: string,
-  montant: number
+// Marque comme payées les missions (pointages) indiquées, plutôt que
+// des mois entiers : un admin peut ainsi payer au fil des missions,
+// à n'importe quel moment, sans attendre la fin du mois.
+export async function markEntriesPaid(
+  entryIds: string[]
 ): Promise<ActionResult> {
   const { user } = await requireAdmin();
 
+  if (entryIds.length === 0) {
+    return { success: true };
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.from("payments").insert({
-    extra_id: extraId,
-    mois,
-    montant,
-    paye_par: user.id,
-  });
+  const { error } = await supabase
+    .from("time_entries")
+    .update({
+      paye: true,
+      paye_le: new Date().toISOString(),
+      paye_par: user.id,
+    })
+    .in("id", entryIds);
 
   if (error) {
-    console.error("markMonthPaid failed:", error);
-    return { error: `Impossible d'enregistrer ce paiement (${error.message}).` };
+    console.error("markEntriesPaid failed:", error);
+    return {
+      error: `Impossible d'enregistrer ce paiement (${error.message}).`,
+    };
   }
 
   revalidatePath("/dashboard/team");
@@ -31,18 +40,14 @@ export async function markMonthPaid(
   return { success: true };
 }
 
-export async function unmarkMonthPaid(
-  extraId: string,
-  mois: string
-): Promise<ActionResult> {
+export async function unmarkEntryPaid(entryId: string): Promise<ActionResult> {
   await requireAdmin();
 
   const supabase = await createClient();
   const { error } = await supabase
-    .from("payments")
-    .delete()
-    .eq("extra_id", extraId)
-    .eq("mois", mois);
+    .from("time_entries")
+    .update({ paye: false, paye_le: null, paye_par: null })
+    .eq("id", entryId);
 
   if (error) {
     return { error: "Impossible d'annuler ce paiement." };

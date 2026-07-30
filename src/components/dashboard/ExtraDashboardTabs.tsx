@@ -8,7 +8,6 @@ import { ClockInOut } from "@/components/hours/ClockInOut";
 import { WeekCalendar } from "@/components/planning/WeekCalendar";
 import { RecapView } from "@/components/hours/RecapView";
 import type {
-  Payment,
   Profile,
   Shift,
   ShiftWithExtra,
@@ -31,7 +30,6 @@ export function ExtraDashboardTabs({
   entriesByShiftId,
   calendarShifts,
   recapEntries,
-  payments = [],
   today,
 }: {
   profile: Profile;
@@ -40,7 +38,6 @@ export function ExtraDashboardTabs({
   entriesByShiftId: Record<string, TimeEntry>;
   calendarShifts: ShiftWithExtra[];
   recapEntries: TimeEntryWithShift[];
-  payments?: Payment[];
   today: string;
 }) {
   const [tab, setTab] = useState<Tab>("planning");
@@ -112,7 +109,7 @@ export function ExtraDashboardTabs({
       )}
 
       {tab === "heures" && (
-        <RecapView extra={profile} entries={recapEntries} payments={payments} />
+        <RecapView extra={profile} entries={recapEntries} />
       )}
     </div>
   );

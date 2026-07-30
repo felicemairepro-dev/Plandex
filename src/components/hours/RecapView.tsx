@@ -16,17 +16,15 @@ import {
   estimateAmount,
   formatHoursLabel,
 } from "@/lib/monthly-recap";
-import type { Payment, Profile, TimeEntryWithShift } from "@/lib/types";
+import type { Profile, TimeEntryWithShift } from "@/lib/types";
 
 export function RecapView({
   extra,
   entries,
-  payments = [],
   onClose,
 }: {
   extra: Pick<Profile, "full_name" | "email" | "taux_horaire">;
   entries: TimeEntryWithShift[];
-  payments?: Payment[];
   onClose?: () => void;
 }) {
   const [referenceDate, setReferenceDate] = useState(() => new Date());
@@ -52,7 +50,7 @@ export function RecapView({
     month: "long",
     year: "numeric",
   });
-  const monthPayment = payments.find((p) => p.mois === startISO);
+  const paidCount = monthEntries.filter((entry) => entry.paye).length;
 
   return (
     <Card className="printable">
@@ -79,11 +77,16 @@ export function RecapView({
           <h2 className="text-lg font-semibold text-foreground">
             Récapitulatif — {extra.full_name || extra.email}
           </h2>
-          {monthPayment ? (
-            <Badge variant="success">Payé</Badge>
-          ) : (
-            <Badge variant="warning">Non payé</Badge>
-          )}
+          {monthEntries.length > 0 &&
+            (paidCount === monthEntries.length ? (
+              <Badge variant="success">Toutes payées</Badge>
+            ) : paidCount === 0 ? (
+              <Badge variant="warning">Non payées</Badge>
+            ) : (
+              <Badge variant="warning">
+                {paidCount}/{monthEntries.length} payées
+              </Badge>
+            ))}
         </div>
         <p className="mt-1 text-sm capitalize text-muted">{monthLabel}</p>
         <p className="mt-1 text-xs text-muted">
@@ -106,6 +109,7 @@ export function RecapView({
                 <th className="py-2 pr-4 font-medium">Prévu</th>
                 <th className="py-2 pr-4 font-medium">Réel</th>
                 <th className="py-2 pr-4 font-medium">Durée</th>
+                <th className="py-2 pr-4 font-medium">Payé</th>
               </tr>
             </thead>
             <tbody>
@@ -132,6 +136,13 @@ export function RecapView({
                   </td>
                   <td className="py-2 pr-4 text-foreground">
                     {getDurationLabel(entry)}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {entry.paye ? (
+                      <span className="text-success">✓</span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
