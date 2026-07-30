@@ -3,7 +3,7 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { NotificationBell } from "@/components/dashboard/NotificationBell";
-import { LogoutButton } from "@/components/auth/LogoutButton";
+import { ProfileMenu } from "@/components/dashboard/ProfileMenu";
 import { Logo } from "@/components/ui/Logo";
 import type { Notification } from "@/lib/types";
 
@@ -40,7 +40,10 @@ export default async function DashboardLayout({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <NotificationBell notifications={notifications ?? []} />
-            <LogoutButton />
+            <ProfileMenu
+              fullName={profile?.full_name ?? null}
+              email={profile?.email ?? user.email ?? null}
+            />
           </div>
         </div>
       </header>

@@ -12,11 +12,11 @@ const ADMIN_LINKS = [
   { href: "/dashboard/team", label: "Équipe" },
 ];
 
-const COMMON_LINKS = [{ href: "/dashboard/settings", label: "Réglages" }];
-
 export function DashboardNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
-  const links = isAdmin ? [...ADMIN_LINKS, ...COMMON_LINKS] : COMMON_LINKS;
+  const links = isAdmin ? ADMIN_LINKS : [];
+
+  if (links.length === 0) return null;
 
   return (
     <nav className="flex items-center gap-1 whitespace-nowrap">

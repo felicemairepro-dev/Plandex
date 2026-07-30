@@ -183,9 +183,23 @@ export default async function DashboardPage() {
       0
     );
 
-  const salairePrevisionnel =
-    profile.taux_horaire != null
-      ? (upcomingMinutes / 60) * profile.taux_horaire
+  const paidMonths = new Set((payments ?? []).map((p) => p.mois));
+  let unpaidWorkedMinutes = 0;
+  for (const entry of timeEntries ?? []) {
+    if (!entry.heure_arrivee || !entry.heure_depart || !entry.shift) continue;
+    const entryMonthISO = toISODate(
+      getMonthStart(new Date(`${entry.shift.date}T00:00:00`))
+    );
+    if (paidMonths.has(entryMonthISO)) continue;
+    const diff =
+      new Date(entry.heure_depart).getTime() -
+      new Date(entry.heure_arrivee).getTime();
+    if (diff > 0) unpaidWorkedMinutes += Math.round(diff / 60000);
+  }
+
+  const argentAPercevoir =
+    unpaidWorkedMinutes > 0 && profile.taux_horaire != null
+      ? (unpaidWorkedMinutes / 60) * profile.taux_horaire
       : null;
 
   const currentMonthISO = toISODate(getMonthStart(new Date()));
@@ -215,14 +229,16 @@ export default async function DashboardPage() {
           hint="Créneaux restant à faire"
         />
         <KpiCard
-          label="Salaire prévisionnel à percevoir"
+          label="Argent à percevoir"
           value={
-            salairePrevisionnel != null
-              ? `${salairePrevisionnel.toFixed(2)} €`
-              : "Taux non renseigné"
+            unpaidWorkedMinutes === 0
+              ? "—"
+              : argentAPercevoir != null
+                ? `${argentAPercevoir.toFixed(2)} €`
+                : "Taux non renseigné"
           }
           href="/dashboard/hours"
-          hint="Basé sur les heures restant à faire"
+          hint="Basé sur les heures déjà effectuées, non encore payées"
         />
         <KpiCard
           label={`Paiement de ${new Date().toLocaleDateString("fr-FR", { month: "long" })}`}

@@ -98,7 +98,7 @@ export function ClockInOut({
           <button
             onClick={handleClockOut}
             disabled={pending}
-            className="w-full rounded-xl bg-accent px-4 py-4 text-base font-semibold text-accent-foreground shadow-sm transition-all duration-200 hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-foreground px-4 py-4 text-base font-semibold text-background shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? "Enregistrement…" : "Pointer le départ"}
           </button>
