@@ -46,6 +46,20 @@ function getExtraColor(extraId: string) {
 
 const PROGRESS_COLOR_ENCOURS = "#1d4ed8";
 
+type ShiftPhase = "avenir" | "encours" | "termine";
+
+const PROGRESS_PHASE_LABELS: Record<ShiftPhase, string> = {
+  avenir: "À venir",
+  encours: "En cours",
+  termine: "Terminé",
+};
+
+const PROGRESS_PHASE_DOT_COLORS: Record<ShiftPhase, string> = {
+  avenir: "#b9752e",
+  encours: PROGRESS_COLOR_ENCOURS,
+  termine: "#2f6b45",
+};
+
 function getShiftProgressPhase(
   shift: ShiftWithExtra,
   now: Date
@@ -266,6 +280,23 @@ export function WeekCalendar({
         </div>
       </div>
 
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          {(Object.keys(PROGRESS_PHASE_LABELS) as ShiftPhase[]).map((phase) => (
+            <span key={phase} className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: PROGRESS_PHASE_DOT_COLORS[phase] }}
+              />
+              {PROGRESS_PHASE_LABELS[phase]}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5 text-success">
+            ✓ Arrivée pointée
+          </span>
+        </div>
+      )}
+
       {view === "semaine" ? (
         <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
           <div className="grid min-w-[840px] grid-cols-[56px_repeat(7,1fr)]">
@@ -343,6 +374,9 @@ export function WeekCalendar({
                       entriesByShiftId[shift.id]?.heure_arrivee
                     );
                     const appearance = getBlockAppearance(shift, readOnly, today);
+                    const phase = isCancelled
+                      ? null
+                      : getShiftProgressPhase(shift, today);
 
                     return (
                       <Block
@@ -359,7 +393,16 @@ export function WeekCalendar({
                             ✓
                           </span>
                         )}
-                        <p className="font-semibold">
+                        <p className="flex items-center gap-1.5 font-semibold">
+                          {!readOnly && phase && (
+                            <span
+                              className="inline-block h-2 w-2 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: PROGRESS_PHASE_DOT_COLORS[phase],
+                              }}
+                              title={PROGRESS_PHASE_LABELS[phase]}
+                            />
+                          )}
                           {shift.heure_debut.slice(0, 5)}–
                           {shift.heure_fin.slice(0, 5)}
                         </p>
@@ -422,6 +465,9 @@ export function WeekCalendar({
                         entriesByShiftId[shift.id]?.heure_arrivee
                       );
                       const appearance = getBlockAppearance(shift, readOnly, today);
+                      const phase = isCancelled
+                        ? null
+                        : getShiftProgressPhase(shift, today);
                       return (
                         <Chip
                           key={shift.id}
@@ -431,6 +477,15 @@ export function WeekCalendar({
                           className={`relative w-full truncate rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight ${appearance.className}`}
                           style={appearance.style}
                         >
+                          {!readOnly && phase && (
+                            <span
+                              className="mr-0.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                              style={{
+                                backgroundColor: PROGRESS_PHASE_DOT_COLORS[phase],
+                              }}
+                              title={PROGRESS_PHASE_LABELS[phase]}
+                            />
+                          )}
                           {!readOnly && !isCancelled && hasArrived && (
                             <span className="mr-0.5 text-success">✓</span>
                           )}
