@@ -5,57 +5,31 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
-// Marque comme payées les missions (pointages) indiquées, plutôt que
-// des mois entiers : un admin peut ainsi payer au fil des missions,
-// à n'importe quel moment, sans attendre la fin du mois.
-export async function markEntriesPaid(
-  entryIds: string[]
+// Indique à un extra qu'il a été payé — un simple message dans sa
+// cloche de notifications (table déjà existante, aucune modification
+// de la base nécessaire). C'est volontairement indicatif : l'admin
+// paie en dehors de l'application, ce bouton sert juste à le prévenir
+// et à garder une trace visible pour les deux.
+export async function markExtraPaid(
+  extraId: string,
+  message: string
 ): Promise<ActionResult> {
-  const { user } = await requireAdmin();
-
-  if (entryIds.length === 0) {
-    return { success: true };
-  }
+  await requireAdmin();
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("time_entries")
-    .update({
-      paye: true,
-      paye_le: new Date().toISOString(),
-      paye_par: user.id,
-    })
-    .in("id", entryIds);
+  const { error } = await supabase.from("notifications").insert({
+    user_id: extraId,
+    message,
+  });
 
   if (error) {
-    console.error("markEntriesPaid failed:", error);
+    console.error("markExtraPaid failed:", error);
     return {
-      error: `Impossible d'enregistrer ce paiement (${error.message}).`,
+      error: `Impossible d'envoyer la confirmation de paiement (${error.message}).`,
     };
   }
 
   revalidatePath("/dashboard/team");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/hours");
-  return { success: true };
-}
-
-export async function unmarkEntryPaid(entryId: string): Promise<ActionResult> {
-  await requireAdmin();
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("time_entries")
-    .update({ paye: false, paye_le: null, paye_par: null })
-    .eq("id", entryId);
-
-  if (error) {
-    return { error: "Impossible d'annuler ce paiement." };
-  }
-
-  revalidatePath("/dashboard/team");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/hours");
   return { success: true };
 }
 

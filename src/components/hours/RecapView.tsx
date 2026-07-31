@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import {
   addMonths,
   getMonthEnd,
@@ -50,7 +49,6 @@ export function RecapView({
     month: "long",
     year: "numeric",
   });
-  const paidCount = monthEntries.filter((entry) => entry.paye).length;
 
   return (
     <Card className="printable">
@@ -77,16 +75,6 @@ export function RecapView({
           <h2 className="text-lg font-semibold text-foreground">
             Récapitulatif — {extra.full_name || extra.email}
           </h2>
-          {monthEntries.length > 0 &&
-            (paidCount === monthEntries.length ? (
-              <Badge variant="success">Toutes payées</Badge>
-            ) : paidCount === 0 ? (
-              <Badge variant="warning">Non payées</Badge>
-            ) : (
-              <Badge variant="warning">
-                {paidCount}/{monthEntries.length} payées
-              </Badge>
-            ))}
         </div>
         <p className="mt-1 text-sm capitalize text-muted">{monthLabel}</p>
         <p className="mt-1 text-xs text-muted">
@@ -109,7 +97,6 @@ export function RecapView({
                 <th className="py-2 pr-4 font-medium">Prévu</th>
                 <th className="py-2 pr-4 font-medium">Réel</th>
                 <th className="py-2 pr-4 font-medium">Durée</th>
-                <th className="py-2 pr-4 font-medium">Payé</th>
               </tr>
             </thead>
             <tbody>
@@ -136,13 +123,6 @@ export function RecapView({
                   </td>
                   <td className="py-2 pr-4 text-foreground">
                     {getDurationLabel(entry)}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {entry.paye ? (
-                      <span className="text-success">✓</span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
                   </td>
                 </tr>
               ))}

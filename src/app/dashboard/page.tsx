@@ -4,8 +4,7 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ExtraDashboardTabs } from "@/components/dashboard/ExtraDashboardTabs";
 import { isShiftActiveNow, shiftDurationHours } from "@/lib/kpi";
-import { formatHoursLabel } from "@/lib/monthly-recap";
-import { withPaymentColumnFallback } from "@/lib/supabase/time-entries";
+import { estimateAmount, formatHoursLabel } from "@/lib/monthly-recap";
 import type {
   Shift,
   ShiftWithExtra,
@@ -131,15 +130,13 @@ export default async function DashboardPage() {
       .order("date")
       .order("heure_debut")
       .returns<Shift[]>(),
-    withPaymentColumnFallback<TimeEntryWithShift>(
-      "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)",
-      (select) =>
-        supabase
-          .from("time_entries")
-          .select(select)
-          .eq("extra_id", user.id)
-          .returns<TimeEntryWithShift[]>()
-    ).then(({ data }) => ({ data })),
+    supabase
+      .from("time_entries")
+      .select(
+        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+      )
+      .eq("extra_id", user.id)
+      .returns<TimeEntryWithShift[]>(),
   ]);
 
   const entriesByShiftId: Record<string, TimeEntry> = {};
@@ -185,19 +182,7 @@ export default async function DashboardPage() {
     completedEntries.map((entry) => entry.shift?.date).filter(Boolean)
   ).size;
 
-  let unpaidWorkedMinutes = 0;
-  for (const entry of completedEntries) {
-    if (entry.paye) continue;
-    const diff =
-      new Date(entry.heure_depart as string).getTime() -
-      new Date(entry.heure_arrivee as string).getTime();
-    if (diff > 0) unpaidWorkedMinutes += Math.round(diff / 60000);
-  }
-
-  const argentAPercevoir =
-    unpaidWorkedMinutes > 0 && profile.taux_horaire != null
-      ? (unpaidWorkedMinutes / 60) * profile.taux_horaire
-      : null;
+  const argentAPercevoir = estimateAmount(workedMinutes, profile.taux_horaire);
 
   return (
     <div className="flex flex-col gap-6">
@@ -228,14 +213,14 @@ export default async function DashboardPage() {
         <KpiCard
           label="Argent à percevoir"
           value={
-            unpaidWorkedMinutes === 0
+            workedMinutes === 0
               ? "—"
               : argentAPercevoir != null
                 ? `${argentAPercevoir.toFixed(2)} €`
                 : "Taux non renseigné"
           }
           href="/dashboard/hours"
-          hint="Basé sur les missions déjà effectuées, non encore payées"
+          hint="Basé sur les heures déjà effectuées — indicatif, paiement en dehors de l'application"
         />
       </div>
 

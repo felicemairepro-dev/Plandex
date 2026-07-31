@@ -117,7 +117,6 @@ export function HoursTable({
       "Départ réel",
       "Durée",
       "Corrigé manuellement",
-      "Payé",
       "Taux horaire (€)",
       "Montant estimé (€)",
     ];
@@ -143,7 +142,6 @@ export function HoursTable({
         formatLocalTime(entry.heure_depart),
         getDurationLabel(entry),
         entry.corrige_par_admin ? "Oui" : "Non",
-        entry.paye ? "Oui" : "Non",
         tauxHoraire != null ? tauxHoraire.toFixed(2) : "",
         montant != null ? montant.toFixed(2) : "",
       ];
@@ -328,7 +326,6 @@ export function HoursTable({
                           {entry.corrige_par_admin && (
                             <Badge variant="neutral">Corrigé</Badge>
                           )}
-                          {entry.paye && <Badge variant="success">Payé</Badge>}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">

@@ -1,6 +1,5 @@
 import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
-import { withPaymentColumnFallback } from "@/lib/supabase/time-entries";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
 import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
@@ -37,15 +36,13 @@ export default async function TeamPage() {
         .select("id, code, utilise, cree_par, cree_le, expire_le")
         .order("cree_le", { ascending: false })
         .returns<InviteCode[]>(),
-      withPaymentColumnFallback<TimeEntryWithShift>(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)",
-        (select) =>
-          supabase
-            .from("time_entries")
-            .select(select)
-            .order("cree_le", { ascending: false })
-            .returns<TimeEntryWithShift[]>()
-      ).then(({ data }) => ({ data })),
+      supabase
+        .from("time_entries")
+        .select(
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+        )
+        .order("cree_le", { ascending: false })
+        .returns<TimeEntryWithShift[]>(),
     ]);
 
   const historyByExtraId = new Map<string, TimeEntryWithShift[]>();

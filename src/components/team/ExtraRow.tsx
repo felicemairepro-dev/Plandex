@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
-  markEntriesPaid,
+  markExtraPaid,
   toggleExtraActive,
   updateExtra,
 } from "@/app/dashboard/team/actions";
@@ -28,7 +27,6 @@ export function ExtraRow({
   extra: Profile;
   history: TimeEntryWithShift[];
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
@@ -39,6 +37,7 @@ export function ExtraRow({
   const [togglePending, startToggle] = useTransition();
   const [paymentPending, startPaymentTransition] = useTransition();
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [justPaid, setJustPaid] = useState<string | null>(null);
 
   const [prevState, setPrevState] = useState(state);
   if (prevState !== state) {
@@ -59,22 +58,29 @@ export function ExtraRow({
     (sum, entry) => sum + computeEntryMinutes(entry),
     0
   );
-  const unpaidEntries = completedEntries.filter((entry) => !entry.paye);
-  const unpaidMinutes = unpaidEntries.reduce(
-    (sum, entry) => sum + computeEntryMinutes(entry),
-    0
-  );
-  const unpaidAmount = estimateAmount(unpaidMinutes, extra.taux_horaire);
+  const totalAmount = estimateAmount(totalWorkedMinutes, extra.taux_horaire);
 
   function handleMarkPaid() {
     setPaymentError(null);
     startPaymentTransition(async () => {
-      const result = await markEntriesPaid(unpaidEntries.map((e) => e.id));
+      const label =
+        totalAmount != null
+          ? `${totalAmount.toFixed(2)} € pour ${formatHoursLabel(totalWorkedMinutes)} effectuées`
+          : `${formatHoursLabel(totalWorkedMinutes)} effectuées`;
+      const message = `Vous avez été payé — ${label}.`;
+      const result = await markExtraPaid(extra.id, message);
       if (result.error) {
         setPaymentError(result.error);
         return;
       }
-      router.refresh();
+      setJustPaid(
+        new Date().toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
     });
   }
 
@@ -195,54 +201,40 @@ export function ExtraRow({
         </div>
       </div>
 
-      {completedEntries.length === 0 ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background px-4 py-3">
-          <p className="text-sm text-muted">
-            Aucune mission effectuée pour le moment — rien à payer pour
-            l&apos;instant.
+      <div
+        className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
+          justPaid ? "bg-success-bg" : "bg-background"
+        }`}
+      >
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            {completedEntries.length === 0
+              ? "Aucune mission effectuée pour le moment"
+              : totalAmount != null
+                ? `${totalAmount.toFixed(2)} € au total`
+                : "Taux horaire non renseigné"}
           </p>
-          <Badge variant="neutral">Aucune mission</Badge>
+          <p className="text-sm text-muted">
+            {justPaid
+              ? `Marqué comme payé le ${justPaid} — l'extra a été prévenu.`
+              : "Indicatif — le paiement se fait en dehors de l'application."}
+          </p>
         </div>
-      ) : (
-        <div
-          className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
-            unpaidEntries.length === 0 ? "bg-success-bg" : "bg-background"
-          }`}
-        >
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              {unpaidEntries.length === 0
-                ? "Toutes les missions ont été payées"
-                : `${unpaidEntries.length} mission${unpaidEntries.length > 1 ? "s" : ""} non payée${unpaidEntries.length > 1 ? "s" : ""}`}
-            </p>
-            <p className="text-sm text-muted">
-              {unpaidEntries.length === 0
-                ? "Payez au fil des missions, quand vous voulez."
-                : unpaidAmount != null
-                  ? `${unpaidAmount.toFixed(2)} € restant à payer pour ${(unpaidMinutes / 60).toFixed(1)}h effectuées`
-                  : "Taux horaire non renseigné"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {unpaidEntries.length === 0 ? (
-              <Badge variant="success">Tout est payé</Badge>
-            ) : (
-              <Badge variant="warning">En attente de paiement</Badge>
-            )}
-            <Button
-              variant="secondary"
-              loading={paymentPending}
-              disabled={unpaidEntries.length === 0}
-              onClick={handleMarkPaid}
-            >
-              Marquer comme payé
-            </Button>
-          </div>
-          {paymentError && (
-            <p className="w-full text-sm text-danger">{paymentError}</p>
-          )}
+        <div className="flex items-center gap-2">
+          {justPaid && <Badge variant="success">Payé</Badge>}
+          <Button
+            variant="secondary"
+            loading={paymentPending}
+            disabled={completedEntries.length === 0}
+            onClick={handleMarkPaid}
+          >
+            Marquer comme payé
+          </Button>
         </div>
-      )}
+        {paymentError && (
+          <p className="w-full text-sm text-danger">{paymentError}</p>
+        )}
+      </div>
 
       {showHistory && (
         <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
@@ -273,9 +265,6 @@ export function ExtraRow({
                       <span className="ml-2 text-xs text-sand-foreground">
                         corrigé
                       </span>
-                    )}
-                    {entry.paye && (
-                      <span className="ml-2 text-xs text-success">payé</span>
                     )}
                   </span>
                 </li>
