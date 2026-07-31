@@ -1,7 +1,7 @@
 import { HTMLAttributes } from "react";
 import { clsx } from "@/lib/utils";
 
-type BadgeVariant = "success" | "warning" | "neutral" | "danger";
+type BadgeVariant = "success" | "warning" | "neutral" | "danger" | "info";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -12,6 +12,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   warning: "bg-warning-bg text-warning",
   neutral: "bg-sand/40 text-sand-foreground",
   danger: "bg-danger-bg text-danger",
+  info: "bg-info-bg text-info",
 };
 
 export function Badge({

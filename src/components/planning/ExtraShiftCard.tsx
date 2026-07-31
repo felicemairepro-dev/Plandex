@@ -1,7 +1,14 @@
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SHIFT_STATUS_BADGE, SHIFT_STATUS_LABELS } from "@/lib/shift-status";
+import { getShiftProgressPhase, SHIFT_PHASE_LABELS } from "@/lib/shift-phase";
 import type { Shift } from "@/lib/types";
+
+const PHASE_BADGE_VARIANT = {
+  avenir: "warning",
+  encours: "info",
+  termine: "success",
+} as const;
 
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("fr-FR", {
@@ -19,6 +26,7 @@ export function ExtraShiftCard({
   children?: React.ReactNode;
 }) {
   const isCancelled = shift.statut === "annule";
+  const phase = isCancelled ? null : getShiftProgressPhase(shift, new Date());
 
   return (
     <Card className={isCancelled ? "p-5 opacity-70" : "p-5"}>
@@ -35,6 +43,11 @@ export function ExtraShiftCard({
           <Badge variant={SHIFT_STATUS_BADGE[shift.statut]}>
             {SHIFT_STATUS_LABELS[shift.statut]}
           </Badge>
+          {phase && (
+            <Badge variant={PHASE_BADGE_VARIANT[phase]}>
+              {SHIFT_PHASE_LABELS[phase]}
+            </Badge>
+          )}
         </div>
       </div>
       <div

@@ -13,6 +13,7 @@ import {
   timeToMinutes,
   toISODate,
 } from "@/lib/date-utils";
+import { getShiftProgressPhase, type ShiftPhase } from "@/lib/shift-phase";
 import type { Profile, ShiftWithExtra, TimeEntry } from "@/lib/types";
 
 const HOUR_HEIGHT = 56;
@@ -46,8 +47,6 @@ function getExtraColor(extraId: string) {
 
 const PROGRESS_COLOR_ENCOURS = "#1d4ed8";
 
-type ShiftPhase = "avenir" | "encours" | "termine";
-
 const PROGRESS_PHASE_LABELS: Record<ShiftPhase, string> = {
   avenir: "À venir",
   encours: "En cours",
@@ -59,21 +58,6 @@ const PROGRESS_PHASE_DOT_COLORS: Record<ShiftPhase, string> = {
   encours: PROGRESS_COLOR_ENCOURS,
   termine: "#2f6b45",
 };
-
-function getShiftProgressPhase(
-  shift: ShiftWithExtra,
-  now: Date
-): "avenir" | "encours" | "termine" {
-  const todayISO = toISODate(now);
-  if (shift.date < todayISO) return "termine";
-  if (shift.date > todayISO) return "avenir";
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const start = timeToMinutes(shift.heure_debut);
-  const end = timeToMinutes(shift.heure_fin);
-  if (nowMinutes < start) return "avenir";
-  if (nowMinutes < end) return "encours";
-  return "termine";
-}
 
 /**
  * Couleur d'un créneau dans le calendrier : par extra pour l'admin (pour

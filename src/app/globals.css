@@ -17,6 +17,8 @@
   --success-bg: #e7f0e1;
   --warning: #b9752e;
   --warning-bg: #fbf1e1;
+  --info: #1d4ed8;
+  --info-bg: #e3e9fc;
 }
 
 @theme inline {
@@ -36,6 +38,8 @@
   --color-success-bg: var(--success-bg);
   --color-warning: var(--warning);
   --color-warning-bg: var(--warning-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
   --font-sans: var(--font-manrope);
 }
 
