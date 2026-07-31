@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import {
   markAllNotificationsRead,
@@ -38,14 +38,22 @@ export function NotificationBell({
 
   const unreadCount = items.filter((n) => !n.lu).length;
 
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
   function handleOpenToggle() {
     setOpen((v) => !v);
-  }
-
-  function handleContainerBlur(event: React.FocusEvent<HTMLDivElement>) {
-    const next = event.relatedTarget as Node | null;
-    if (next && containerRef.current?.contains(next)) return;
-    setOpen(false);
   }
 
   function handleItemClick(notification: Notification) {
@@ -66,7 +74,7 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative" ref={containerRef} onBlur={handleContainerBlur}>
+    <div className="relative" ref={containerRef}>
       <button
         onClick={handleOpenToggle}
         aria-label="Notifications"
