@@ -17,7 +17,7 @@ import { getShiftProgressPhase, type ShiftPhase } from "@/lib/shift-phase";
 import type { Profile, ShiftWithExtra, TimeEntry } from "@/lib/types";
 
 const HOUR_HEIGHT = 56;
-const DEFAULT_RANGE: [number, number] = [7, 21];
+const DEFAULT_RANGE: [number, number] = [8, 24];
 const MONTH_GRID_WEEKS = 6;
 const MAX_CHIPS_PER_DAY = 3;
 
