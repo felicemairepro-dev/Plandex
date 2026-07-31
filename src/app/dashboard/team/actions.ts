@@ -5,28 +5,45 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
-// Indique à un extra qu'il a été payé — un simple message dans sa
-// cloche de notifications (table déjà existante, aucune modification
-// de la base nécessaire). C'est volontairement indicatif : l'admin
-// paie en dehors de l'application, ce bouton sert juste à le prévenir
-// et à garder une trace visible pour les deux.
-export async function markExtraPaid(
+// Bascule le statut payé/non payé de tous les pointages effectués d'un
+// extra. Le statut est persisté sur time_entries.paye — un rechargement
+// de page ne le réinitialise plus. Quand on marque comme payé, l'extra
+// reçoit aussi une notification ; annuler par erreur (recliquer) ne
+// renvoie pas de notification.
+export async function setExtraPaidStatus(
   extraId: string,
-  message: string
+  entryIds: string[],
+  paye: boolean,
+  message?: string
 ): Promise<ActionResult> {
   await requireAdmin();
 
+  if (entryIds.length === 0) {
+    return { error: "Aucun pointage à mettre à jour." };
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.from("notifications").insert({
-    user_id: extraId,
-    message,
-  });
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ paye, paye_le: paye ? new Date().toISOString() : null })
+    .eq("extra_id", extraId)
+    .in("id", entryIds);
 
   if (error) {
-    console.error("markExtraPaid failed:", error);
+    console.error("setExtraPaidStatus failed:", error);
     return {
-      error: `Impossible d'envoyer la confirmation de paiement (${error.message}).`,
+      error: `Impossible de mettre à jour le statut de paiement (${error.message}).`,
     };
+  }
+
+  if (paye && message) {
+    const { error: notifError } = await supabase.from("notifications").insert({
+      user_id: extraId,
+      message,
+    });
+    if (notifError) {
+      console.error("setExtraPaidStatus notification failed:", notifError);
+    }
   }
 
   revalidatePath("/dashboard/team");

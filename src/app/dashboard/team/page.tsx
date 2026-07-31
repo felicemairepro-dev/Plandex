@@ -39,7 +39,7 @@ export default async function TeamPage() {
       supabase
         .from("time_entries")
         .select(
-          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, paye, paye_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
         )
         .order("cree_le", { ascending: false })
         .returns<TimeEntryWithShift[]>(),

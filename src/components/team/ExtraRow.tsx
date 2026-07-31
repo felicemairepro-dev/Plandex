@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import {
-  markExtraPaid,
+  setExtraPaidStatus,
   toggleExtraActive,
   updateExtra,
 } from "@/app/dashboard/team/actions";
@@ -37,7 +37,6 @@ export function ExtraRow({
   const [togglePending, startToggle] = useTransition();
   const [paymentPending, startPaymentTransition] = useTransition();
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [justPaid, setJustPaid] = useState<string | null>(null);
 
   const [prevState, setPrevState] = useState(state);
   if (prevState !== state) {
@@ -60,27 +59,40 @@ export function ExtraRow({
   );
   const totalAmount = estimateAmount(totalWorkedMinutes, extra.taux_horaire);
 
-  function handleMarkPaid() {
+  const allPaid =
+    completedEntries.length > 0 && completedEntries.every((entry) => entry.paye);
+  const lastPaidAt = completedEntries
+    .filter((entry) => entry.paye && entry.paye_le)
+    .map((entry) => entry.paye_le as string)
+    .sort()
+    .at(-1);
+  const paidLabel = lastPaidAt
+    ? new Date(lastPaidAt).toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  function handleTogglePaid() {
     setPaymentError(null);
     startPaymentTransition(async () => {
+      const nextPaye = !allPaid;
       const label =
         totalAmount != null
           ? `${totalAmount.toFixed(2)} € pour ${formatHoursLabel(totalWorkedMinutes)} effectuées`
           : `${formatHoursLabel(totalWorkedMinutes)} effectuées`;
-      const message = `Vous avez été payé — ${label}.`;
-      const result = await markExtraPaid(extra.id, message);
+      const message = nextPaye ? `Vous avez été payé — ${label}.` : undefined;
+      const result = await setExtraPaidStatus(
+        extra.id,
+        completedEntries.map((entry) => entry.id),
+        nextPaye,
+        message
+      );
       if (result.error) {
         setPaymentError(result.error);
-        return;
       }
-      setJustPaid(
-        new Date().toLocaleDateString("fr-FR", {
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
     });
   }
 
@@ -203,7 +215,7 @@ export function ExtraRow({
 
       <div
         className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
-          justPaid ? "bg-success-bg" : "bg-background"
+          allPaid ? "bg-success-bg" : "bg-background"
         }`}
       >
         <div>
@@ -215,20 +227,20 @@ export function ExtraRow({
                 : "Taux horaire non renseigné"}
           </p>
           <p className="text-sm text-muted">
-            {justPaid
-              ? `Marqué comme payé le ${justPaid} — l'extra a été prévenu.`
+            {allPaid && paidLabel
+              ? `Marqué comme payé le ${paidLabel} — l'extra a été prévenu.`
               : "Indicatif — le paiement se fait en dehors de l'application."}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {justPaid && <Badge variant="success">Payé</Badge>}
+          {allPaid && <Badge variant="success">Payé</Badge>}
           <Button
             variant="secondary"
             loading={paymentPending}
             disabled={completedEntries.length === 0}
-            onClick={handleMarkPaid}
+            onClick={handleTogglePaid}
           >
-            Marquer comme payé
+            {allPaid ? "Marquer comme non payé" : "Marquer comme payé"}
           </Button>
         </div>
         {paymentError && (
@@ -265,6 +277,9 @@ export function ExtraRow({
                       <span className="ml-2 text-xs text-sand-foreground">
                         corrigé
                       </span>
+                    )}
+                    {entry.paye && (
+                      <span className="ml-2 text-xs text-success">payé</span>
                     )}
                   </span>
                 </li>

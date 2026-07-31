@@ -51,6 +51,8 @@ export interface TimeEntry {
   heure_depart: string | null;
   corrige_par_admin: boolean;
   cree_le: string;
+  paye: boolean;
+  paye_le: string | null;
 }
 
 export interface TimeEntryWithShift extends TimeEntry {
