@@ -27,8 +27,9 @@ export default async function TeamPage() {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, phone, role, actif, taux_horaire")
+        .select("id, full_name, email, phone, role, actif, supprime, taux_horaire")
         .eq("role", "extra")
+        .eq("supprime", false)
         .order("full_name")
         .returns<Profile[]>(),
       supabase

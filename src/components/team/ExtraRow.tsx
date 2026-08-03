@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { RecapModal } from "@/components/hours/RecapModal";
+import { DeleteExtraModal } from "@/components/team/DeleteExtraModal";
 import { formatLocalTime, getDurationLabel } from "@/lib/hours-utils";
 import {
   computeEntryMinutes,
@@ -30,6 +31,7 @@ export function ExtraRow({
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [state, formAction, pending] = useActionState(
     updateExtra,
     initialState
@@ -147,19 +149,38 @@ export function ExtraRow({
             </p>
           )}
 
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setEditing(false)}
+              className="!border-danger !text-danger"
+              onClick={() => setShowDelete(true)}
             >
-              Annuler
+              Supprimer l&apos;équipier
             </Button>
-            <Button type="submit" loading={pending}>
-              Enregistrer
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setEditing(false)}
+              >
+                Annuler
+              </Button>
+              <Button type="submit" loading={pending}>
+                Enregistrer
+              </Button>
+            </div>
           </div>
         </form>
+
+        {showDelete && (
+          <DeleteExtraModal
+            extraId={extra.id}
+            extraName={extra.full_name || extra.email || "cet équipier"}
+            onClose={() => setShowDelete(false)}
+            onDeleted={() => setShowDelete(false)}
+          />
+        )}
       </div>
     );
   }

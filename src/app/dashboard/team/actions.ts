@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
@@ -139,4 +140,65 @@ export async function toggleExtraActive(id: string, actif: boolean) {
   }
 
   revalidatePath("/dashboard/team");
+}
+
+// Supprime un équipier. Deux variantes :
+// - keepHours = false : suppression complète du compte auth, qui
+//   entraîne (via ON DELETE CASCADE) la suppression du profil, de ses
+//   créneaux et de ses pointages.
+// - keepHours = true : le compte auth est conservé pour ne pas casser
+//   la chaîne de clés étrangères (donc garder les pointages), mais il
+//   est désactivé, marqué "supprimé" (masqué de la liste équipe) et son
+//   email est libéré pour permettre une réinscription avec un nouveau
+//   code d'invitation, y compris avec la même adresse.
+export async function deleteExtra(
+  extraId: string,
+  keepHours: boolean
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const admin = createAdminClient();
+
+  if (!keepHours) {
+    const { error } = await admin.auth.admin.deleteUser(extraId);
+    if (error) {
+      console.error("deleteExtra (full) failed:", error);
+      return {
+        error: `Impossible de supprimer ce compte (${error.message}).`,
+      };
+    }
+    revalidatePath("/dashboard/team");
+    return { success: true };
+  }
+
+  const freedEmail = `supprime-${extraId}@plandex.invalid`;
+  const { error: authError } = await admin.auth.admin.updateUserById(
+    extraId,
+    { email: freedEmail, email_confirm: true }
+  );
+  if (authError) {
+    console.error("deleteExtra (keepHours, auth) failed:", authError);
+    return {
+      error: `Impossible de supprimer ce compte (${authError.message}).`,
+    };
+  }
+
+  // La mise à jour de "actif" passe par le trigger anti-escalade de
+  // privilèges (migration 0007), qui exige une session admin authentifiée
+  // (auth.uid() = un admin) plutôt que la clé service-role : on utilise
+  // donc le client de la session en cours, déjà vérifiée admin ci-dessus.
+  const supabase = await createClient();
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ actif: false, supprime: true, email: freedEmail })
+    .eq("id", extraId);
+  if (profileError) {
+    console.error("deleteExtra (keepHours, profile) failed:", profileError);
+    return {
+      error: `Impossible de supprimer ce compte (${profileError.message}).`,
+    };
+  }
+
+  revalidatePath("/dashboard/team");
+  return { success: true };
 }

@@ -12,6 +12,7 @@ export interface Profile {
   phone: string | null;
   role: UserRole;
   actif: boolean;
+  supprime: boolean;
   taux_horaire: number | null;
 }
 
