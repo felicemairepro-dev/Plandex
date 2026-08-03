@@ -1,5 +1,5 @@
 import { timeToMinutes, toISODate } from "@/lib/date-utils";
-import type { Shift } from "@/lib/types";
+import type { Shift, TimeEntry } from "@/lib/types";
 
 export type ShiftPhase = "avenir" | "encours" | "termine";
 
@@ -9,10 +9,19 @@ export const SHIFT_PHASE_LABELS: Record<ShiftPhase, string> = {
   termine: "Terminé",
 };
 
+/**
+ * Avancement d'un créneau. Priorité au pointage réel de l'extra quand il
+ * est disponible (arrivée pointée => en cours, départ pointé => terminé) ;
+ * sinon on se base sur la date/heure prévue du créneau.
+ */
 export function getShiftProgressPhase(
   shift: Pick<Shift, "date" | "heure_debut" | "heure_fin">,
-  now: Date
+  now: Date,
+  entry?: Pick<TimeEntry, "heure_arrivee" | "heure_depart"> | null
 ): ShiftPhase {
+  if (entry?.heure_depart) return "termine";
+  if (entry?.heure_arrivee) return "encours";
+
   const todayISO = toISODate(now);
   if (shift.date < todayISO) return "termine";
   if (shift.date > todayISO) return "avenir";
@@ -20,6 +29,5 @@ export function getShiftProgressPhase(
   const start = timeToMinutes(shift.heure_debut);
   const end = timeToMinutes(shift.heure_fin);
   if (nowMinutes < start) return "avenir";
-  if (nowMinutes < end) return "encours";
-  return "termine";
+  return nowMinutes < end ? "avenir" : "termine";
 }

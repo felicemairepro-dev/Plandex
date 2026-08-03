@@ -67,14 +67,15 @@ const PROGRESS_PHASE_DOT_COLORS: Record<ShiftPhase, string> = {
 function getBlockAppearance(
   shift: ShiftWithExtra,
   readOnly: boolean,
-  now: Date
+  now: Date,
+  entry?: TimeEntry
 ): { className: string; style: React.CSSProperties } {
   if (shift.statut === "annule") {
     return { className: CANCELLED_STYLE, style: {} };
   }
 
   if (readOnly) {
-    const phase = getShiftProgressPhase(shift, now);
+    const phase = getShiftProgressPhase(shift, now, entry);
     if (phase === "avenir") {
       return {
         className: "border-warning bg-warning-bg text-warning",
@@ -361,10 +362,19 @@ export function WeekCalendar({
                     const hasArrived = Boolean(
                       entriesByShiftId[shift.id]?.heure_arrivee
                     );
-                    const appearance = getBlockAppearance(shift, readOnly, today);
+                    const appearance = getBlockAppearance(
+                      shift,
+                      readOnly,
+                      today,
+                      entriesByShiftId[shift.id]
+                    );
                     const phase = isCancelled
                       ? null
-                      : getShiftProgressPhase(shift, today);
+                      : getShiftProgressPhase(
+                          shift,
+                          today,
+                          entriesByShiftId[shift.id]
+                        );
 
                     return (
                       <Block
@@ -452,10 +462,19 @@ export function WeekCalendar({
                       const hasArrived = Boolean(
                         entriesByShiftId[shift.id]?.heure_arrivee
                       );
-                      const appearance = getBlockAppearance(shift, readOnly, today);
+                      const appearance = getBlockAppearance(
+                        shift,
+                        readOnly,
+                        today,
+                        entriesByShiftId[shift.id]
+                      );
                       const phase = isCancelled
                         ? null
-                        : getShiftProgressPhase(shift, today);
+                        : getShiftProgressPhase(
+                            shift,
+                            today,
+                            entriesByShiftId[shift.id]
+                          );
                       return (
                         <Chip
                           key={shift.id}

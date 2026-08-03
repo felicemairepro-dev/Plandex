@@ -76,7 +76,11 @@ export function ExtraDashboardTabs({
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {upcoming.map((shift) => (
-                  <ExtraShiftCard key={shift.id} shift={shift}>
+                  <ExtraShiftCard
+                    key={shift.id}
+                    shift={shift}
+                    entry={entriesByShiftId[shift.id] ?? null}
+                  >
                     {shift.date === today && (
                       <ClockInOut
                         shift={shift}
@@ -96,7 +100,11 @@ export function ExtraDashboardTabs({
               </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {past.map((shift) => (
-                  <ExtraShiftCard key={shift.id} shift={shift} />
+                  <ExtraShiftCard
+                    key={shift.id}
+                    shift={shift}
+                    entry={entriesByShiftId[shift.id] ?? null}
+                  />
                 ))}
               </div>
             </section>
@@ -105,7 +113,11 @@ export function ExtraDashboardTabs({
       )}
 
       {tab === "calendrier" && (
-        <WeekCalendar shifts={calendarShifts} readOnly />
+        <WeekCalendar
+          shifts={calendarShifts}
+          entriesByShiftId={entriesByShiftId}
+          readOnly
+        />
       )}
 
       {tab === "heures" && (
