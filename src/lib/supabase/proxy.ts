@@ -25,8 +25,27 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => matchesPath(pathname, path));
 }
 
+// Every request pays a round trip to Supabase for auth.getUser() below.
+// A visitor with no Supabase session cookie at all can never resolve to a
+// logged-in user, so skip the network call entirely in that (very common —
+// first visit, marketing pages) case.
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token"));
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  if (!hasSupabaseAuthCookie(request)) {
+    if (!isPublicPath(request.nextUrl.pathname)) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", request.nextUrl.pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
