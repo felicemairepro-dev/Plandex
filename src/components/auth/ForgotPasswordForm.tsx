@@ -28,6 +28,7 @@ export function ForgotPasswordForm() {
     setLoading(false);
 
     if (resetError) {
+      console.error("resetPasswordForEmail failed:", resetError);
       setError("Une erreur est survenue. Réessayez dans un instant.");
       return;
     }
