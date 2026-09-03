@@ -12,21 +12,22 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, profile } = await getProfile();
+  const supabase = await createClient();
+  const [{ user, profile }, { data: notifications }] = await Promise.all([
+    getProfile(),
+    supabase
+      .from("notifications")
+      .select("id, user_id, message, lu, cree_le")
+      .order("cree_le", { ascending: false })
+      .limit(30)
+      .returns<Notification[]>(),
+  ]);
 
   if (!user) {
     redirect("/login");
   }
 
   const isAdmin = profile?.role === "admin";
-
-  const supabase = await createClient();
-  const { data: notifications } = await supabase
-    .from("notifications")
-    .select("id, user_id, message, lu, cree_le")
-    .order("cree_le", { ascending: false })
-    .limit(30)
-    .returns<Notification[]>();
 
   return (
     <div className="min-h-screen bg-background">
