@@ -31,7 +31,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-4 sm:gap-6">
             <DashboardLogoLink />
