@@ -68,8 +68,10 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
         setConfirmingId(null);
         setLocalCodes((current) => current.filter((c) => c.id !== id));
         router.refresh();
-      } catch {
-        setError("Impossible de supprimer ce code.");
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Impossible de supprimer ce code."
+        );
       } finally {
         setDeletingId(null);
       }
@@ -127,23 +129,25 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
                 <Badge variant={c.utilise ? "neutral" : "warning"}>
                   {c.utilise ? "Utilisé" : "En attente"}
                 </Badge>
-                <Button
-                  variant="secondary"
-                  loading={deletingId === c.id}
-                  onClick={() => handleDelete(c.id)}
-                  onBlur={() =>
-                    setConfirmingId((current) =>
-                      current === c.id ? null : current
-                    )
-                  }
-                  className={
-                    confirmingId === c.id
-                      ? "!border-danger !text-danger"
-                      : "!text-muted"
-                  }
-                >
-                  {confirmingId === c.id ? "Confirmer ?" : "Supprimer"}
-                </Button>
+                {c.utilise && (
+                  <Button
+                    variant="secondary"
+                    loading={deletingId === c.id}
+                    onClick={() => handleDelete(c.id)}
+                    onBlur={() =>
+                      setConfirmingId((current) =>
+                        current === c.id ? null : current
+                      )
+                    }
+                    className={
+                      confirmingId === c.id
+                        ? "!border-danger !text-danger"
+                        : "!text-muted"
+                    }
+                  >
+                    {confirmingId === c.id ? "Confirmer ?" : "Supprimer"}
+                  </Button>
+                )}
               </div>
             </div>
           ))}

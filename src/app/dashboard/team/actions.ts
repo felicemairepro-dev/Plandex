@@ -117,10 +117,24 @@ export async function deleteInviteCode(id: string) {
   await requireAdmin();
 
   const supabase = await createClient();
-  const { error } = await supabase.from("invite_codes").delete().eq("id", id);
+  // Un code encore en attente (non utilisé) ne peut pas être supprimé, pour
+  // toujours garder au moins un code disponible à distribuer. La condition
+  // est appliquée ici en plus du bouton masqué côté UI, pour ne pas
+  // dépendre uniquement du client.
+  const { data, error } = await supabase
+    .from("invite_codes")
+    .delete()
+    .eq("id", id)
+    .eq("utilise", true)
+    .select("id");
 
   if (error) {
     throw new Error("Impossible de supprimer ce code.");
+  }
+  if (!data || data.length === 0) {
+    throw new Error(
+      "Seuls les codes déjà utilisés peuvent être supprimés."
+    );
   }
 
   revalidatePath("/dashboard/team");
