@@ -129,7 +129,8 @@ export async function deleteInviteCode(id: string) {
     .select("id");
 
   if (error) {
-    throw new Error("Impossible de supprimer ce code.");
+    console.error("deleteInviteCode failed:", error);
+    throw new Error(`Impossible de supprimer ce code (${error.message}).`);
   }
   if (!data || data.length === 0) {
     throw new Error(
