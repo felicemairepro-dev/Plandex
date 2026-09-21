@@ -113,7 +113,7 @@ export async function updateExtra(
   return { success: true };
 }
 
-export async function deleteInviteCode(id: string) {
+export async function deleteInviteCode(id: string): Promise<ActionResult> {
   await requireAdmin();
 
   const supabase = await createClient();
@@ -129,16 +129,18 @@ export async function deleteInviteCode(id: string) {
     .select("id");
 
   if (error) {
+    // Next.js masque le message d'une erreur *jetée* (throw) depuis une
+    // Server Action en production — on renvoie donc le résultat au lieu de
+    // throw, seul moyen de faire remonter la vraie cause jusqu'au client.
     console.error("deleteInviteCode failed:", error);
-    throw new Error(`Impossible de supprimer ce code (${error.message}).`);
+    return { error: `Impossible de supprimer ce code (${error.message}).` };
   }
   if (!data || data.length === 0) {
-    throw new Error(
-      "Seuls les codes déjà utilisés peuvent être supprimés."
-    );
+    return { error: "Seuls les codes déjà utilisés peuvent être supprimés." };
   }
 
   revalidatePath("/dashboard/team");
+  return { success: true };
 }
 
 export async function toggleExtraActive(id: string, actif: boolean) {

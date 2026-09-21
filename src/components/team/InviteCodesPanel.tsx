@@ -63,18 +63,15 @@ export function InviteCodesPanel({ codes }: { codes: InviteCode[] }) {
     setError(null);
     setDeletingId(id);
     startTransition(async () => {
-      try {
-        await deleteInviteCode(id);
+      const result = await deleteInviteCode(id);
+      if (result.error) {
+        setError(result.error);
+      } else {
         setConfirmingId(null);
         setLocalCodes((current) => current.filter((c) => c.id !== id));
         router.refresh();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Impossible de supprimer ce code."
-        );
-      } finally {
-        setDeletingId(null);
       }
+      setDeletingId(null);
     });
   }
 
