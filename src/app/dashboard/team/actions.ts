@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -71,7 +72,16 @@ export async function addTeamMember(
     }
     userId = data.user.id;
   } else {
+    // Ce projet Supabase n'autorise pas la création d'un utilisateur
+    // totalement anonyme (ni email ni téléphone) — on passe par un email
+    // technique invisible (même principe que l'email "libéré" utilisé pour
+    // les comptes supprimés) pour satisfaire la contrainte, puis on l'efface
+    // de profiles.email juste après pour que la fiche s'affiche bien comme
+    // "sans accès de connexion".
+    const placeholderEmail = `sans-email-${randomUUID()}@plandex.invalid`;
     const { data, error: createError } = await admin.auth.admin.createUser({
+      email: placeholderEmail,
+      email_confirm: true,
       user_metadata: { full_name: fullName, phone: phone || null, role: "extra" },
     });
 
@@ -82,6 +92,18 @@ export async function addTeamMember(
       };
     }
     userId = data.user.id;
+
+    const supabase = await createClient();
+    const { error: clearEmailError } = await supabase
+      .from("profiles")
+      .update({ email: null })
+      .eq("id", userId);
+    if (clearEmailError) {
+      console.error(
+        "addTeamMember (clear placeholder email) failed:",
+        clearEmailError
+      );
+    }
   }
 
   if (tauxHoraire !== null) {
