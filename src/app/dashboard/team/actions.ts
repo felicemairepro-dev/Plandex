@@ -7,14 +7,26 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
 
-// Ajoute manuellement un équipier, sans passer par un code d'invitation :
-// crée directement le compte (email confirmé) et envoie un email d'invitation
-// Supabase pour qu'il choisisse son mot de passe via /update-password — le
-// même lien que celui du "mot de passe oublié".
+export interface AddTeamMemberResult extends ActionResult {
+  // false quand le membre a été créé sans email : pas d'invitation envoyée,
+  // donc pas d'accès de connexion tant qu'un email n'est pas ajouté plus
+  // tard (via "Modifier").
+  invited?: boolean;
+}
+
+// Ajoute manuellement un équipier, sans passer par un code d'invitation.
+// Seul le prénom est obligatoire ; tous les autres champs sont facultatifs :
+// - avec un email : crée le compte et envoie l'invitation Supabase pour
+//   choisir le mot de passe via /update-password (même lien que "mot de
+//   passe oublié").
+// - sans email : crée quand même le compte (requis par la contrainte
+//   profiles.id -> auth.users.id) mais sans accès de connexion ni email
+//   envoyé — juste une fiche équipe, utilisable tout de suite pour le
+//   planning et le taux horaire.
 export async function addTeamMember(
-  _prevState: ActionResult,
+  _prevState: AddTeamMemberResult,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<AddTeamMemberResult> {
   await requireAdmin();
 
   const firstName = String(formData.get("firstName") || "").trim();
@@ -23,8 +35,8 @@ export async function addTeamMember(
   const phone = String(formData.get("phone") || "").trim();
   const tauxHoraireRaw = String(formData.get("taux_horaire") || "").trim();
 
-  if (!firstName || !lastName || !email) {
-    return { error: "Prénom, nom et email sont obligatoires." };
+  if (!firstName) {
+    return { error: "Le prénom est obligatoire." };
   }
 
   let tauxHoraire: number | null = null;
@@ -35,28 +47,41 @@ export async function addTeamMember(
     }
   }
 
-  const host = (await headers()).get("host");
-  const protocol = host?.startsWith("localhost") ? "http" : "https";
-
+  const fullName = `${firstName} ${lastName}`.trim();
   const admin = createAdminClient();
-  const { data, error: inviteError } =
-    await admin.auth.admin.inviteUserByEmail(email, {
-      data: {
-        full_name: `${firstName} ${lastName}`.trim(),
-        phone: phone || null,
-        role: "extra",
-      },
-      redirectTo: `${protocol}://${host}/auth/confirm?next=/update-password`,
+
+  let userId: string;
+  if (email) {
+    const host = (await headers()).get("host");
+    const protocol = host?.startsWith("localhost") ? "http" : "https";
+    const { data, error: inviteError } =
+      await admin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: fullName, phone: phone || null, role: "extra" },
+        redirectTo: `${protocol}://${host}/auth/confirm?next=/update-password`,
+      });
+
+    if (inviteError || !data.user) {
+      console.error("addTeamMember failed:", inviteError);
+      return {
+        error:
+          inviteError?.code === "email_exists"
+            ? "Un compte existe déjà avec cet email."
+            : `Impossible d'ajouter ce membre (${inviteError?.message}).`,
+      };
+    }
+    userId = data.user.id;
+  } else {
+    const { data, error: createError } = await admin.auth.admin.createUser({
+      user_metadata: { full_name: fullName, phone: phone || null, role: "extra" },
     });
 
-  if (inviteError || !data.user) {
-    console.error("addTeamMember failed:", inviteError);
-    return {
-      error:
-        inviteError?.code === "email_exists"
-          ? "Un compte existe déjà avec cet email."
-          : `Impossible d'ajouter ce membre (${inviteError?.message}).`,
-    };
+    if (createError || !data.user) {
+      console.error("addTeamMember (sans email) failed:", createError);
+      return {
+        error: `Impossible d'ajouter ce membre (${createError?.message}).`,
+      };
+    }
+    userId = data.user.id;
   }
 
   if (tauxHoraire !== null) {
@@ -64,14 +89,14 @@ export async function addTeamMember(
     const { error: tauxError } = await supabase
       .from("profiles")
       .update({ taux_horaire: tauxHoraire })
-      .eq("id", data.user.id);
+      .eq("id", userId);
     if (tauxError) {
       console.error("addTeamMember taux_horaire failed:", tauxError);
     }
   }
 
   revalidatePath("/dashboard/team");
-  return { success: true };
+  return { success: true, invited: Boolean(email) };
 }
 
 // Bascule le statut payé/non payé de tous les pointages effectués d'un
@@ -149,7 +174,11 @@ export async function updateExtra(
   const firstName = String(formData.get("firstName") || "").trim();
   const lastName = String(formData.get("lastName") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
   const tauxHoraireRaw = String(formData.get("taux_horaire") || "").trim();
+  const previousEmail = String(formData.get("previousEmail") || "")
+    .trim()
+    .toLowerCase();
 
   if (!id || !firstName || !lastName) {
     return { error: "Prénom et nom sont obligatoires." };
@@ -163,18 +192,54 @@ export async function updateExtra(
     }
   }
 
+  // Une fiche créée sans email n'a pas de compte de connexion actif : lui en
+  // ajouter un ici active aussi l'accès (met à jour l'email d'authentification
+  // et envoie un lien pour choisir le mot de passe).
+  const activatingEmail = Boolean(email) && email !== previousEmail;
+  if (activatingEmail) {
+    const admin = createAdminClient();
+    const { error: authError } = await admin.auth.admin.updateUserById(id, {
+      email,
+      email_confirm: true,
+    });
+    if (authError) {
+      console.error("updateExtra (email) failed:", authError);
+      return {
+        error:
+          authError.code === "email_exists"
+            ? "Un compte existe déjà avec cet email."
+            : `Impossible de mettre à jour l'email (${authError.message}).`,
+      };
+    }
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
     .update({
       full_name: `${firstName} ${lastName}`.trim(),
       phone: phone || null,
+      email: email || null,
       taux_horaire: tauxHoraire,
     })
     .eq("id", id);
 
   if (error) {
     return { error: "Impossible de mettre à jour ce profil." };
+  }
+
+  if (activatingEmail) {
+    const host = (await headers()).get("host");
+    const protocol = host?.startsWith("localhost") ? "http" : "https";
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo: `${protocol}://${host}/auth/confirm?next=/update-password`,
+      }
+    );
+    if (resetError) {
+      console.error("updateExtra (activation email) failed:", resetError);
+    }
   }
 
   revalidatePath("/dashboard/team");

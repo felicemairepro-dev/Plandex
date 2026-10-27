@@ -103,6 +103,11 @@ export function ExtraRow({
       <div className="flex flex-col gap-4 border-b border-border py-5 last:border-none">
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="id" value={extra.id} />
+          <input
+            type="hidden"
+            name="previousEmail"
+            value={extra.email ?? ""}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               id={`firstName-${extra.id}`}
@@ -119,6 +124,19 @@ export function ExtraRow({
               required
             />
           </div>
+          <Input
+            id={`email-${extra.id}`}
+            name="email"
+            type="email"
+            label="Email"
+            placeholder="vous@exemple.com"
+            defaultValue={extra.email ?? ""}
+            hint={
+              extra.email
+                ? undefined
+                : "Pas encore d'accès de connexion — ajouter un email envoie un lien pour choisir le mot de passe."
+            }
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               id={`phone-${extra.id}`}
@@ -192,7 +210,11 @@ export function ExtraRow({
           <p className="font-medium text-foreground">
             {extra.full_name || "Sans nom"}
           </p>
-          <p className="text-sm text-muted">{extra.email}</p>
+          {extra.email ? (
+            <p className="text-sm text-muted">{extra.email}</p>
+          ) : (
+            <p className="text-sm text-warning">Pas d&apos;accès de connexion</p>
+          )}
           {extra.phone && <p className="text-sm text-muted">{extra.phone}</p>}
           {extra.taux_horaire != null && (
             <p className="text-sm text-muted">{extra.taux_horaire} €/h</p>

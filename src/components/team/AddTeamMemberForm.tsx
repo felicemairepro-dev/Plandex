@@ -2,18 +2,22 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addTeamMember } from "@/app/dashboard/team/actions";
+import {
+  addTeamMember,
+  type AddTeamMemberResult,
+} from "@/app/dashboard/team/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import type { ActionResult } from "@/lib/types";
 
-const initialState: ActionResult = {};
+const initialState: AddTeamMemberResult = {};
+
+type JustAdded = { email: string } | { noAccount: true };
 
 export function AddTeamMemberForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [justAdded, setJustAdded] = useState<JustAdded | null>(null);
   const [pendingEmail, setPendingEmail] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
@@ -25,7 +29,9 @@ export function AddTeamMemberForm() {
   if (prevState !== state) {
     setPrevState(state);
     if (state.success) {
-      setJustAdded(pendingEmail || "cette adresse");
+      setJustAdded(
+        state.invited ? { email: pendingEmail } : { noAccount: true }
+      );
       setOpen(false);
     }
   }
@@ -47,8 +53,9 @@ export function AddTeamMemberForm() {
             Ajouter un équipier
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Crée directement son compte — il recevra un email pour choisir
-            son mot de passe.
+            Seul le prénom est obligatoire. Ajoute un email pour qu&apos;il
+            puisse se connecter — sans email, c&apos;est juste une fiche
+            pour le planning et le taux horaire.
           </p>
         </div>
         <Button
@@ -65,8 +72,15 @@ export function AddTeamMemberForm() {
 
       {justAdded && (
         <p className="mt-4 rounded-xl bg-success-bg px-3.5 py-2.5 text-sm text-success">
-          Compte créé — un email a été envoyé à{" "}
-          <strong>{justAdded}</strong> pour choisir son mot de passe.
+          {"email" in justAdded ? (
+            <>
+              Compte créé — un email a été envoyé à{" "}
+              <strong>{justAdded.email}</strong> pour choisir son mot de
+              passe.
+            </>
+          ) : (
+            "Fiche créée — sans email, cette personne n'a pas encore accès à son propre compte. Tu pourras lui en ajouter un plus tard via « Modifier »."
+          )}
         </p>
       )}
 
@@ -83,7 +97,7 @@ export function AddTeamMemberForm() {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="firstName" name="firstName" label="Prénom" required />
-            <Input id="lastName" name="lastName" label="Nom" required />
+            <Input id="lastName" name="lastName" label="Nom" />
           </div>
           <Input
             id="email"
@@ -91,7 +105,7 @@ export function AddTeamMemberForm() {
             type="email"
             label="Email"
             placeholder="vous@exemple.com"
-            required
+            hint="Facultatif — sans email, la personne n'aura pas d'accès de connexion."
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="phone" name="phone" type="tel" label="Téléphone" />
