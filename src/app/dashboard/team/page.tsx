@@ -2,6 +2,7 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { TeamList } from "@/components/team/TeamList";
+import { AddTeamMemberForm } from "@/components/team/AddTeamMemberForm";
 import { InviteCodesPanel } from "@/components/team/InviteCodesPanel";
 import type { InviteCode, Profile, TimeEntryWithShift } from "@/lib/types";
 
@@ -62,6 +63,7 @@ export default async function TeamPage() {
         </p>
       </div>
 
+      <AddTeamMemberForm />
       <InviteCodesPanel codes={codes ?? []} />
       <TeamList
         extras={extras ?? []}

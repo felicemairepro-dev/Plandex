@@ -1,10 +1,78 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import type { ActionResult, InviteCode } from "@/lib/types";
+
+// Ajoute manuellement un équipier, sans passer par un code d'invitation :
+// crée directement le compte (email confirmé) et envoie un email d'invitation
+// Supabase pour qu'il choisisse son mot de passe via /update-password — le
+// même lien que celui du "mot de passe oublié".
+export async function addTeamMember(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const firstName = String(formData.get("firstName") || "").trim();
+  const lastName = String(formData.get("lastName") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const phone = String(formData.get("phone") || "").trim();
+  const tauxHoraireRaw = String(formData.get("taux_horaire") || "").trim();
+
+  if (!firstName || !lastName || !email) {
+    return { error: "Prénom, nom et email sont obligatoires." };
+  }
+
+  let tauxHoraire: number | null = null;
+  if (tauxHoraireRaw) {
+    tauxHoraire = Number(tauxHoraireRaw.replace(",", "."));
+    if (Number.isNaN(tauxHoraire) || tauxHoraire < 0) {
+      return { error: "Le taux horaire doit être un nombre positif." };
+    }
+  }
+
+  const host = (await headers()).get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+
+  const admin = createAdminClient();
+  const { data, error: inviteError } =
+    await admin.auth.admin.inviteUserByEmail(email, {
+      data: {
+        full_name: `${firstName} ${lastName}`.trim(),
+        phone: phone || null,
+        role: "extra",
+      },
+      redirectTo: `${protocol}://${host}/auth/confirm?next=/update-password`,
+    });
+
+  if (inviteError || !data.user) {
+    console.error("addTeamMember failed:", inviteError);
+    return {
+      error:
+        inviteError?.code === "email_exists"
+          ? "Un compte existe déjà avec cet email."
+          : `Impossible d'ajouter ce membre (${inviteError?.message}).`,
+    };
+  }
+
+  if (tauxHoraire !== null) {
+    const supabase = await createClient();
+    const { error: tauxError } = await supabase
+      .from("profiles")
+      .update({ taux_horaire: tauxHoraire })
+      .eq("id", data.user.id);
+    if (tauxError) {
+      console.error("addTeamMember taux_horaire failed:", tauxError);
+    }
+  }
+
+  revalidatePath("/dashboard/team");
+  return { success: true };
+}
 
 // Bascule le statut payé/non payé de tous les pointages effectués d'un
 // extra. Le statut est persisté sur time_entries.paye — un rechargement
