@@ -2,7 +2,7 @@ import { getProfile } from "@/lib/supabase/get-profile";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { HoursTable } from "@/components/hours/HoursTable";
-import type { Profile, TimeEntryWithShift } from "@/lib/types";
+import type { Profile, ShiftWithExtra, TimeEntryWithShift } from "@/lib/types";
 
 export default async function HoursPage() {
   const { profile } = await getProfile();
@@ -22,21 +22,36 @@ export default async function HoursPage() {
 
   const supabase = await createClient();
 
-  const [{ data: entries }, { data: extras }] = await Promise.all([
-    supabase
-      .from("time_entries")
-      .select(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
-      )
-      .order("cree_le", { ascending: false })
-      .returns<TimeEntryWithShift[]>(),
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, role, actif, taux_horaire")
-      .eq("role", "extra")
-      .order("full_name")
-      .returns<Profile[]>(),
-  ]);
+  const [{ data: entries }, { data: extras }, { data: shifts }] =
+    await Promise.all([
+      supabase
+        .from("time_entries")
+        .select(
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
+        )
+        .order("cree_le", { ascending: false })
+        .returns<TimeEntryWithShift[]>(),
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, role, actif, taux_horaire")
+        .eq("role", "extra")
+        .order("full_name")
+        .returns<Profile[]>(),
+      supabase
+        .from("shifts")
+        .select(
+          "id, date, heure_debut, heure_fin, poste, lieu, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
+        )
+        .order("date", { ascending: false })
+        .returns<ShiftWithExtra[]>(),
+    ]);
+
+  // Créneaux qui n'ont encore aucun pointage — un admin doit pouvoir en
+  // saisir un manuellement même si l'équipier n'a jamais pointé lui-même.
+  const shiftIdsWithEntry = new Set((entries ?? []).map((e) => e.shift_id));
+  const pendingShifts = (shifts ?? []).filter(
+    (shift) => !shiftIdsWithEntry.has(shift.id)
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,7 +62,11 @@ export default async function HoursPage() {
         </p>
       </div>
 
-      <HoursTable entries={entries ?? []} extras={extras ?? []} />
+      <HoursTable
+        entries={entries ?? []}
+        extras={extras ?? []}
+        pendingShifts={pendingShifts}
+      />
     </div>
   );
 }

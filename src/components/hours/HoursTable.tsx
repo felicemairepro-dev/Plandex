@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CorrectionForm } from "@/components/hours/CorrectionForm";
+import { AddEntryForm } from "@/components/hours/AddEntryForm";
 import {
   addDays,
   getMonthEnd,
@@ -26,9 +27,13 @@ import {
   estimateAmount,
   formatHoursLabel,
 } from "@/lib/monthly-recap";
-import type { Profile, TimeEntryWithShift } from "@/lib/types";
+import type { Profile, ShiftWithExtra, TimeEntryWithShift } from "@/lib/types";
 
 const PAGE_SIZE = 15;
+
+type DisplayRow =
+  | { kind: "entry"; entry: TimeEntryWithShift }
+  | { kind: "pending"; shift: ShiftWithExtra };
 
 type PeriodType = "semaine" | "mois";
 
@@ -57,9 +62,11 @@ function escapeCsv(value: string) {
 export function HoursTable({
   entries,
   extras,
+  pendingShifts,
 }: {
   entries: TimeEntryWithShift[];
   extras: Profile[];
+  pendingShifts: ShiftWithExtra[];
 }) {
   const [periodType, setPeriodType] = useState<PeriodType>("semaine");
   const [referenceDate, setReferenceDate] = useState(() => new Date());
@@ -67,6 +74,7 @@ export function HoursTable({
   const [page, setPage] = useState(0);
   const [correctingEntry, setCorrectingEntry] =
     useState<TimeEntryWithShift | null>(null);
+  const [addingShift, setAddingShift] = useState<ShiftWithExtra | null>(null);
 
   const { start, end } = getPeriodRange(referenceDate, periodType);
   const startISO = toISODate(start);
@@ -90,9 +98,24 @@ export function HoursTable({
   );
   const recap = buildRecapByExtra(filtered, tauxHoraireByExtraId);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const filteredPending = pendingShifts.filter((shift) => {
+    if (shift.date < startISO || shift.date > endISO) return false;
+    if (extraFilter !== "all" && shift.extra_id !== extraFilter) return false;
+    return true;
+  });
+
+  const displayRows: DisplayRow[] = [
+    ...filtered.map((entry) => ({ kind: "entry" as const, entry })),
+    ...filteredPending.map((shift) => ({ kind: "pending" as const, shift })),
+  ].toSorted((a, b) => {
+    const dateA = a.kind === "entry" ? a.entry.shift!.date : a.shift.date;
+    const dateB = b.kind === "entry" ? b.entry.shift!.date : b.shift.date;
+    return dateA < dateB ? -1 : 1;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
-  const pageRows = filtered.slice(
+  const pageRows = displayRows.slice(
     currentPage * PAGE_SIZE,
     currentPage * PAGE_SIZE + PAGE_SIZE
   );
@@ -280,7 +303,46 @@ export function HoursTable({
                   </td>
                 </tr>
               ) : (
-                pageRows.map((entry) => {
+                pageRows.map((row) => {
+                  if (row.kind === "pending") {
+                    const shift = row.shift;
+                    return (
+                      <tr
+                        key={`pending-${shift.id}`}
+                        className="border-b border-border last:border-none"
+                      >
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {shift.extra?.full_name || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">
+                          {new Date(`${shift.date}T00:00:00`).toLocaleDateString(
+                            "fr-FR",
+                            { day: "numeric", month: "short" }
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted">{shift.poste}</td>
+                        <td className="px-4 py-3 text-muted">
+                          {shift.heure_debut.slice(0, 5)}–
+                          {shift.heure_fin.slice(0, 5)}
+                        </td>
+                        <td className="px-4 py-3 text-muted">—</td>
+                        <td className="px-4 py-3 text-muted">—</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="warning">Pas encore pointé</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            variant="secondary"
+                            onClick={() => setAddingShift(shift)}
+                          >
+                            Ajouter un pointage
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const entry = row.entry;
                   const lateMinutes = getLateMinutes(entry);
                   const isLate =
                     lateMinutes !== null && lateMinutes > LATE_THRESHOLD_MINUTES;
@@ -372,6 +434,15 @@ export function HoursTable({
           <CorrectionForm
             entry={correctingEntry}
             onDone={() => setCorrectingEntry(null)}
+          />
+        </Modal>
+      )}
+
+      {addingShift && (
+        <Modal onClose={() => setAddingShift(null)}>
+          <AddEntryForm
+            shift={addingShift}
+            onDone={() => setAddingShift(null)}
           />
         </Modal>
       )}
