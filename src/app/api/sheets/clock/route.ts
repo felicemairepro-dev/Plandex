@@ -33,10 +33,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const prenom = typeof body?.prenom === "string" ? body.prenom.trim() : "";
   const date = typeof body?.date === "string" ? body.date : "";
-  const heureArrivee =
-    typeof body?.heureArrivee === "string" ? body.heureArrivee : null;
-  const heureDepart =
-    typeof body?.heureDepart === "string" ? body.heureDepart : null;
+  // Une clé absente = "ne pas toucher à ce champ" ; une chaîne vide = "effacer
+  // ce pointage" (la case a été vidée dans le Sheet) ; sinon, une heure HH:mm.
+  const hasArrivee =
+    typeof body === "object" && body !== null && "heureArrivee" in body;
+  const hasDepart =
+    typeof body === "object" && body !== null && "heureDepart" in body;
+  const heureArrivee = hasArrivee ? String(body.heureArrivee ?? "") : null;
+  const heureDepart = hasDepart ? String(body.heureDepart ?? "") : null;
 
   if (!prenom || !DATE_RE.test(date)) {
     return NextResponse.json(
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!heureArrivee && !heureDepart) {
+  if (!hasArrivee && !hasDepart) {
     return NextResponse.json(
       { error: "heureArrivee ou heureDepart est obligatoire." },
       { status: 400 }
@@ -55,7 +59,7 @@ export async function POST(request: NextRequest) {
     (heureDepart && !TIME_RE.test(heureDepart))
   ) {
     return NextResponse.json(
-      { error: "Les heures doivent être au format HH:mm." },
+      { error: "Les heures doivent être au format HH:mm (ou vide pour effacer)." },
       { status: 400 }
     );
   }
@@ -112,13 +116,21 @@ export async function POST(request: NextRequest) {
   }
 
   let shiftId = existingShift?.id;
+  const hasActualTime = Boolean(heureArrivee) || Boolean(heureDepart);
+
   if (!shiftId) {
+    // Rien à effacer et rien à créer : la case était déjà vide, on ignore.
+    if (!hasActualTime) {
+      return NextResponse.json({ success: true, noop: true });
+    }
+
+    const defaultTime = heureArrivee || heureDepart || "00:00";
     const { data: newShift, error: shiftCreateError } = await supabase
       .from("shifts")
       .insert({
         date,
-        heure_debut: heureArrivee ?? heureDepart,
-        heure_fin: heureDepart ?? heureArrivee,
+        heure_debut: heureArrivee || defaultTime,
+        heure_fin: heureDepart || defaultTime,
         lieu: "Stand Parly 2",
         poste: "Vente",
         extra_id: extraId,
@@ -142,11 +154,15 @@ export async function POST(request: NextRequest) {
     shift_id: shiftId,
     extra_id: extraId,
   };
-  if (heureArrivee) {
-    timeEntryPayload.heure_arrivee = parisWallTimeToISOString(date, heureArrivee);
+  if (hasArrivee) {
+    timeEntryPayload.heure_arrivee = heureArrivee
+      ? parisWallTimeToISOString(date, heureArrivee)
+      : null;
   }
-  if (heureDepart) {
-    timeEntryPayload.heure_depart = parisWallTimeToISOString(date, heureDepart);
+  if (hasDepart) {
+    timeEntryPayload.heure_depart = heureDepart
+      ? parisWallTimeToISOString(date, heureDepart)
+      : null;
   }
 
   const { error: upsertError } = await supabase
