@@ -29,6 +29,8 @@ export interface Shift {
   statut: ShiftStatus;
   cree_par: string;
   cree_le: string;
+  // Prime sur le taux horaire du profil quand renseigné.
+  taux_horaire: number | null;
 }
 
 export interface ShiftWithExtra extends Shift {
@@ -59,7 +61,7 @@ export interface TimeEntry {
 export interface TimeEntryWithShift extends TimeEntry {
   shift: Pick<
     Shift,
-    "date" | "heure_debut" | "heure_fin" | "poste" | "lieu"
+    "date" | "heure_debut" | "heure_fin" | "poste" | "lieu" | "taux_horaire"
   > | null;
   extra: Pick<Profile, "id" | "full_name"> | null;
 }
@@ -70,4 +72,13 @@ export interface Notification {
   message: string;
   lu: boolean;
   cree_le: string;
+}
+
+export interface Payment {
+  id: string;
+  extra_id: string;
+  mois: string;
+  montant: number;
+  paye_le: string;
+  paye_par: string;
 }

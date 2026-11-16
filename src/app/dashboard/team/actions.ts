@@ -126,13 +126,18 @@ export async function addTeamMember(
 // de page ne le réinitialise plus. Quand on marque comme payé, l'extra
 // reçoit aussi une notification ; annuler par erreur (recliquer) ne
 // renvoie pas de notification.
+// `mois` est le premier jour du mois concerné (ex: "2026-10-01") — sert de
+// clé pour l'historique des paiements (table payments), un enregistrement
+// par extra et par mois.
 export async function setExtraPaidStatus(
   extraId: string,
   entryIds: string[],
   paye: boolean,
+  mois: string,
+  montant: number,
   message?: string
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const { user } = await requireAdmin();
 
   if (entryIds.length === 0) {
     return { error: "Aucun pointage à mettre à jour." };
@@ -150,6 +155,28 @@ export async function setExtraPaidStatus(
     return {
       error: `Impossible de mettre à jour le statut de paiement (${error.message}).`,
     };
+  }
+
+  // Garde une trace durable de ce qui a été payé mois par mois, séparée du
+  // flag "paye" sur chaque pointage (qui peut changer si un pointage est
+  // corrigé après coup).
+  if (paye) {
+    const { error: paymentError } = await supabase.from("payments").upsert(
+      { extra_id: extraId, mois, montant, paye_par: user.id },
+      { onConflict: "extra_id,mois" }
+    );
+    if (paymentError) {
+      console.error("setExtraPaidStatus payment upsert failed:", paymentError);
+    }
+  } else {
+    const { error: deleteError } = await supabase
+      .from("payments")
+      .delete()
+      .eq("extra_id", extraId)
+      .eq("mois", mois);
+    if (deleteError) {
+      console.error("setExtraPaidStatus payment delete failed:", deleteError);
+    }
   }
 
   if (paye && message) {

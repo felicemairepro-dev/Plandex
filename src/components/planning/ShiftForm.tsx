@@ -381,6 +381,18 @@ export function ShiftForm({
           </Select>
         </div>
 
+        <Input
+          id="taux_horaire"
+          name="taux_horaire"
+          type="number"
+          step="0.01"
+          min="0"
+          label="Taux horaire pour ce créneau (€)"
+          placeholder="Laisser vide pour utiliser le taux du profil"
+          defaultValue={shift?.taux_horaire ?? ""}
+          hint="Facultatif — prime sur le taux horaire habituel de l'extra, seulement pour ce créneau."
+        />
+
         {state.error && (
           <p className="rounded-xl bg-danger-bg px-3.5 py-2.5 text-sm text-danger">
             {state.error}

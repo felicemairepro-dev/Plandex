@@ -27,7 +27,7 @@ export default async function HoursPage() {
       supabase
         .from("time_entries")
         .select(
-          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
+          "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu, taux_horaire), extra:profiles(id, full_name)"
         )
         .order("cree_le", { ascending: false })
         .returns<TimeEntryWithShift[]>(),
@@ -40,7 +40,7 @@ export default async function HoursPage() {
       supabase
         .from("shifts")
         .select(
-          "id, date, heure_debut, heure_fin, poste, lieu, extra_id, statut, cree_par, cree_le, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
+          "id, date, heure_debut, heure_fin, poste, lieu, extra_id, statut, cree_par, cree_le, taux_horaire, extra:profiles!shifts_extra_id_fkey(id, full_name, email)"
         )
         .order("date", { ascending: false })
         .returns<ShiftWithExtra[]>(),

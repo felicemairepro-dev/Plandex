@@ -44,7 +44,11 @@ export function RecapView({
     (sum, entry) => sum + computeEntryMinutes(entry),
     0
   );
-  const montantEstime = estimateAmount(totalMinutes, extra.taux_horaire);
+  const montantEstime = monthEntries.reduce((sum, entry) => {
+    const minutes = computeEntryMinutes(entry);
+    const taux = entry.shift?.taux_horaire ?? extra.taux_horaire;
+    return sum + (estimateAmount(minutes, taux) ?? 0);
+  }, 0);
   const monthLabel = monthStart.toLocaleDateString("fr-FR", {
     month: "long",
     year: "numeric",

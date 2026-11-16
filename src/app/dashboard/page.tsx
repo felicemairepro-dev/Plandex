@@ -5,6 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ExtraDashboardTabs } from "@/components/dashboard/ExtraDashboardTabs";
 import { isShiftActiveNow, shiftDurationHours } from "@/lib/kpi";
 import { estimateAmount, formatHoursLabel } from "@/lib/monthly-recap";
+import { toISODate } from "@/lib/date-utils";
 import type {
   Shift,
   ShiftWithExtra,
@@ -38,9 +39,13 @@ export default async function DashboardPage() {
           >(),
         supabase
           .from("time_entries")
-          .select("extra_id, heure_arrivee, heure_depart")
+          .select(
+            "extra_id, heure_arrivee, heure_depart, paye, shift:shifts(date, taux_horaire)"
+          )
           .returns<
-            Pick<TimeEntry, "extra_id" | "heure_arrivee" | "heure_depart">[]
+            (Pick<TimeEntry, "extra_id" | "heure_arrivee" | "heure_depart" | "paye"> & {
+              shift: Pick<Shift, "date" | "taux_horaire"> | null;
+            })[]
           >(),
       ]);
 
@@ -52,9 +57,11 @@ export default async function DashboardPage() {
     const activeShiftsNow = (shifts ?? []).filter((s) =>
       isShiftActiveNow(s, now)
     ).length;
+    const currentMonth = toISODate(now).slice(0, 7);
 
     let totalWorkedMinutes = 0;
     let realCost = 0;
+    let aPayerCeMois = 0;
     for (const entry of entries ?? []) {
       if (!entry.heure_arrivee || !entry.heure_depart) continue;
       const diff =
@@ -63,8 +70,13 @@ export default async function DashboardPage() {
       if (diff <= 0) continue;
       const minutes = Math.round(diff / 60000);
       totalWorkedMinutes += minutes;
-      const taux = tauxHoraireByExtraId.get(entry.extra_id);
-      if (taux != null) realCost += (minutes / 60) * taux;
+      const taux =
+        entry.shift?.taux_horaire ?? tauxHoraireByExtraId.get(entry.extra_id);
+      if (taux == null) continue;
+      realCost += (minutes / 60) * taux;
+      if (!entry.paye && entry.shift?.date.slice(0, 7) === currentMonth) {
+        aPayerCeMois += (minutes / 60) * taux;
+      }
     }
 
     const totalCost = (shifts ?? [])
@@ -103,6 +115,12 @@ export default async function DashboardPage() {
             href="/dashboard/hours"
           />
           <KpiCard
+            label="À payer ce mois-ci"
+            value={`${aPayerCeMois.toFixed(2)} €`}
+            href="/dashboard/team"
+            hint="Heures effectuées ce mois-ci, non encore marquées payées"
+          />
+          <KpiCard
             label="Coûts réels"
             value={`${realCost.toFixed(2)} €`}
             href="/dashboard/hours"
@@ -124,7 +142,7 @@ export default async function DashboardPage() {
     supabase
       .from("shifts")
       .select(
-        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le"
+        "id, date, heure_debut, heure_fin, lieu, poste, extra_id, statut, cree_par, cree_le, taux_horaire"
       )
       .eq("extra_id", user.id)
       .order("date")
@@ -133,7 +151,7 @@ export default async function DashboardPage() {
     supabase
       .from("time_entries")
       .select(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu)"
+        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu, taux_horaire)"
       )
       .eq("extra_id", user.id)
       .returns<TimeEntryWithShift[]>(),

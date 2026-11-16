@@ -26,7 +26,7 @@ export default async function StatsPage() {
     supabase
       .from("time_entries")
       .select(
-        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu), extra:profiles(id, full_name)"
+        "id, shift_id, extra_id, heure_arrivee, heure_depart, corrige_par_admin, cree_le, shift:shifts(date, heure_debut, heure_fin, poste, lieu, taux_horaire), extra:profiles(id, full_name)"
       )
       .returns<TimeEntryWithShift[]>(),
     supabase

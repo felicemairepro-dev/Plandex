@@ -18,6 +18,23 @@ interface NewShiftRow {
   extra_id: string;
   statut: ShiftStatus;
   cree_par: string;
+  taux_horaire: number | null;
+}
+
+function readTauxHoraireOverride(formData: FormData): {
+  value: number | null;
+  error: string | null;
+} {
+  const raw = String(formData.get("taux_horaire") || "").trim();
+  if (!raw) return { value: null, error: null };
+  const value = Number(raw.replace(",", "."));
+  if (Number.isNaN(value) || value < 0) {
+    return {
+      value: null,
+      error: "Le taux horaire du créneau doit être un nombre positif.",
+    };
+  }
+  return { value, error: null };
 }
 
 function readShiftFields(formData: FormData) {
@@ -115,6 +132,10 @@ async function createShiftRange(
     return { error: "Tous les champs sont obligatoires." };
   }
 
+  const { value: tauxHoraire, error: tauxError } =
+    readTauxHoraireOverride(formData);
+  if (tauxError) return { error: tauxError };
+
   const dates = getDateRange(dateDebut, dateFin, MAX_RANGE_DAYS);
   if (dates.length === 0) {
     return {
@@ -159,6 +180,7 @@ async function createShiftRange(
       extra_id: extraId,
       statut,
       cree_par: userId,
+      taux_horaire: tauxHoraire,
     });
   }
 
@@ -199,11 +221,14 @@ export async function createShift(
   if (validationError) {
     return { error: validationError };
   }
+  const { value: tauxHoraire, error: tauxError } =
+    readTauxHoraireOverride(formData);
+  if (tauxError) return { error: tauxError };
 
   const supabase = await createClient();
   const { data: shift, error } = await supabase
     .from("shifts")
-    .insert({ ...fields, cree_par: user.id })
+    .insert({ ...fields, cree_par: user.id, taux_horaire: tauxHoraire })
     .select("id, date, heure_debut, heure_fin, lieu, poste")
     .single();
 
@@ -230,12 +255,15 @@ export async function updateShift(
   if (!id || validationError) {
     return { error: validationError || "Créneau invalide." };
   }
+  const { value: tauxHoraire, error: tauxError } =
+    readTauxHoraireOverride(formData);
+  if (tauxError) return { error: tauxError };
 
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("shifts")
-    .update(fields)
+    .update({ ...fields, taux_horaire: tauxHoraire })
     .eq("id", id);
 
   if (error) {

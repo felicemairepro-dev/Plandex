@@ -28,6 +28,15 @@ export function estimateAmount(totalMinutes: number, tauxHoraire: number | null)
   return Math.round((totalMinutes / 60) * tauxHoraire * 100) / 100;
 }
 
+// Le taux propre au créneau prime sur celui du profil quand il est
+// renseigné (ex: un créneau exceptionnel payé à un tarif différent).
+export function effectiveTauxHoraire(
+  entry: TimeEntryWithShift,
+  tauxHoraireByExtraId: Map<string, number | null>
+) {
+  return entry.shift?.taux_horaire ?? tauxHoraireByExtraId.get(entry.extra_id) ?? null;
+}
+
 export function buildRecapByExtra(
   entries: TimeEntryWithShift[],
   tauxHoraireByExtraId: Map<string, number | null>
@@ -48,12 +57,15 @@ export function buildRecapByExtra(
     if (minutes > 0) {
       existing.totalMinutes += minutes;
       existing.shiftsCompleted += 1;
+      const montant = estimateAmount(
+        minutes,
+        effectiveTauxHoraire(entry, tauxHoraireByExtraId)
+      );
+      if (montant != null) {
+        existing.montantEstime = (existing.montantEstime ?? 0) + montant;
+      }
     }
     map.set(entry.extra_id, existing);
-  }
-
-  for (const row of map.values()) {
-    row.montantEstime = estimateAmount(row.totalMinutes, row.tauxHoraire);
   }
 
   return Array.from(map.values()).sort((a, b) =>

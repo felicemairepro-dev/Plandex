@@ -12,12 +12,57 @@ import { Badge } from "@/components/ui/Badge";
 import { RecapModal } from "@/components/hours/RecapModal";
 import { DeleteExtraModal } from "@/components/team/DeleteExtraModal";
 import { formatLocalTime, getDurationLabel } from "@/lib/hours-utils";
-import {
-  computeEntryMinutes,
-  estimateAmount,
-  formatHoursLabel,
-} from "@/lib/monthly-recap";
+import { computeEntryMinutes, formatHoursLabel } from "@/lib/monthly-recap";
 import type { ActionResult, Profile, TimeEntryWithShift } from "@/lib/types";
+
+interface MonthGroup {
+  key: string; // "YYYY-MM"
+  label: string;
+  entries: TimeEntryWithShift[];
+  totalMinutes: number;
+  montant: number;
+  allPaid: boolean;
+  paidLabel: string | null;
+}
+
+function buildMonthGroups(
+  completedEntries: TimeEntryWithShift[],
+  extraTauxHoraire: number | null
+): MonthGroup[] {
+  const map = new Map<string, MonthGroup>();
+
+  for (const entry of completedEntries) {
+    const key = entry.shift!.date.slice(0, 7);
+    const existing = map.get(key) ?? {
+      key,
+      label: new Date(`${key}-01T00:00:00`).toLocaleDateString("fr-FR", {
+        month: "long",
+        year: "numeric",
+      }),
+      entries: [],
+      totalMinutes: 0,
+      montant: 0,
+      allPaid: true,
+      paidLabel: null,
+    };
+
+    existing.entries.push(entry);
+    const minutes = computeEntryMinutes(entry);
+    existing.totalMinutes += minutes;
+    const taux = entry.shift?.taux_horaire ?? extraTauxHoraire;
+    const montant = minutes > 0 && taux != null ? (minutes / 60) * taux : 0;
+    existing.montant += montant;
+    if (!entry.paye) existing.allPaid = false;
+    if (entry.paye && entry.paye_le) {
+      if (!existing.paidLabel || entry.paye_le > existing.paidLabel) {
+        existing.paidLabel = entry.paye_le;
+      }
+    }
+    map.set(key, existing);
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+}
 
 const initialState: ActionResult = {};
 
@@ -59,37 +104,28 @@ export function ExtraRow({
     (sum, entry) => sum + computeEntryMinutes(entry),
     0
   );
-  const totalAmount = estimateAmount(totalWorkedMinutes, extra.taux_horaire);
+  const monthGroups = buildMonthGroups(completedEntries, extra.taux_horaire);
+  const resteAPayer = monthGroups.reduce(
+    (sum, g) => sum + (g.allPaid ? 0 : g.montant),
+    0
+  );
+  const totalPaye = monthGroups.reduce(
+    (sum, g) => sum + (g.allPaid ? g.montant : 0),
+    0
+  );
 
-  const allPaid =
-    completedEntries.length > 0 && completedEntries.every((entry) => entry.paye);
-  const lastPaidAt = completedEntries
-    .filter((entry) => entry.paye && entry.paye_le)
-    .map((entry) => entry.paye_le as string)
-    .sort()
-    .at(-1);
-  const paidLabel = lastPaidAt
-    ? new Date(lastPaidAt).toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
-
-  function handleTogglePaid() {
+  function handleToggleMonthPaid(group: MonthGroup) {
     setPaymentError(null);
     startPaymentTransition(async () => {
-      const nextPaye = !allPaid;
-      const label =
-        totalAmount != null
-          ? `${totalAmount.toFixed(2)} € pour ${formatHoursLabel(totalWorkedMinutes)} effectuées`
-          : `${formatHoursLabel(totalWorkedMinutes)} effectuées`;
+      const nextPaye = !group.allPaid;
+      const label = `${group.montant.toFixed(2)} € pour ${formatHoursLabel(group.totalMinutes)} effectuées en ${group.label}`;
       const message = nextPaye ? `Vous avez été payé — ${label}.` : undefined;
       const result = await setExtraPaidStatus(
         extra.id,
-        completedEntries.map((entry) => entry.id),
+        group.entries.map((entry) => entry.id),
         nextPaye,
+        `${group.key}-01`,
+        group.montant,
         message
       );
       if (result.error) {
@@ -256,38 +292,72 @@ export function ExtraRow({
         </div>
       </div>
 
-      <div
-        className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 ${
-          allPaid ? "bg-success-bg" : "bg-background"
-        }`}
-      >
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            {completedEntries.length === 0
-              ? "Aucune mission effectuée pour le moment"
-              : totalAmount != null
-                ? `${totalAmount.toFixed(2)} € au total`
-                : "Taux horaire non renseigné"}
-          </p>
+      <div className="mt-3 rounded-xl bg-background px-4 py-3">
+        {completedEntries.length === 0 ? (
           <p className="text-sm text-muted">
-            {allPaid && paidLabel
-              ? `Marqué comme payé le ${paidLabel} — l'extra a été prévenu.`
-              : "Indicatif — le paiement se fait en dehors de l'application."}
+            Aucune mission effectuée pour le moment.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {allPaid && <Badge variant="success">Payé</Badge>}
-          <Button
-            variant="secondary"
-            loading={paymentPending}
-            disabled={completedEntries.length === 0}
-            onClick={handleTogglePaid}
-          >
-            {allPaid ? "Marquer comme non payé" : "Marquer comme payé"}
-          </Button>
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">
+                Reste à payer : {resteAPayer.toFixed(2)} €
+              </p>
+              <p className="text-sm text-muted">
+                Déjà payé : {totalPaye.toFixed(2)} €
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              Indicatif — le paiement se fait en dehors de l&apos;application.
+              Historique par mois ci-dessous.
+            </p>
+
+            <ul className="mt-3 flex flex-col gap-2">
+              {monthGroups.map((group) => (
+                <li
+                  key={group.key}
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 ${
+                    group.allPaid ? "bg-success-bg" : "bg-surface"
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-medium capitalize text-foreground">
+                      {group.label}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {formatHoursLabel(group.totalMinutes)} ·{" "}
+                      {group.montant.toFixed(2)} €
+                      {group.allPaid && group.paidLabel && (
+                        <>
+                          {" "}
+                          · payé le{" "}
+                          {new Date(group.paidLabel).toLocaleDateString(
+                            "fr-FR",
+                            { day: "numeric", month: "short" }
+                          )}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {group.allPaid && <Badge variant="success">Payé</Badge>}
+                    <Button
+                      variant="secondary"
+                      loading={paymentPending}
+                      onClick={() => handleToggleMonthPaid(group)}
+                    >
+                      {group.allPaid
+                        ? "Marquer comme non payé"
+                        : "Marquer comme payé"}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {paymentError && (
-          <p className="w-full text-sm text-danger">{paymentError}</p>
+          <p className="mt-2 text-sm text-danger">{paymentError}</p>
         )}
       </div>
 
